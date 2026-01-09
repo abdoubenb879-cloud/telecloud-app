@@ -560,6 +560,76 @@ def rename_file():
         print(f"[RENAME] Error: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/download/bulk', methods=['POST'])
+@csrf.exempt
+@rate_limit
+def download_bulk():
+    """Download multiple files as a ZIP archive."""
+    import zipfile
+    from io import BytesIO
+    
+    if 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    user_id = session['user_id']
+    data = request.get_json()
+    file_ids = data.get('file_ids', [])
+    
+    if not file_ids:
+        return jsonify({"error": "No files specified"}), 400
+    
+    try:
+        # Create in-memory ZIP
+        zip_buffer = BytesIO()
+        bot = get_bot_client()
+        bot.connect()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for file_id in file_ids:
+                try:
+                    file_info = db.get_file(file_id)
+                    if not file_info or str(file_info['user_id']) != str(user_id):
+                        continue
+                    
+                    filename = file_info['filename']
+                    chunks = db.get_chunks(file_id)
+                    
+                    if not chunks:
+                        continue
+                    
+                    # Download and merge chunks
+                    file_data = BytesIO()
+                    for chunk in chunks:
+                        msg_id = chunk['message_id'] if isinstance(chunk, dict) else chunk[3]
+                        chunk_path = bot.download_media(msg_id)
+                        if chunk_path and os.path.exists(chunk_path):
+                            with open(chunk_path, 'rb') as f:
+                                file_data.write(f.read())
+                            os.remove(chunk_path)
+                    
+                    # Add to ZIP
+                    file_data.seek(0)
+                    zip_file.writestr(filename, file_data.read())
+                    print(f"[BULK] Added {filename} to ZIP")
+                    
+                except Exception as e:
+                    print(f"[BULK] Error adding file {file_id}: {e}")
+                    continue
+        
+        zip_buffer.seek(0)
+        
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name='CloudVault-Download.zip'
+        )
+        
+    except Exception as e:
+        print(f"[BULK] Error: {e}")
+        traceback.print_exc()
+        return jsonify({"error": "Failed to create download"}), 500
+
 @app.route('/settings')
 @rate_limit
 def settings_page():

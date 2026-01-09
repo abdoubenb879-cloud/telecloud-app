@@ -600,6 +600,89 @@ a:hover {
     opacity: 1;
 }
 
+/* ============= Multi-Select Mode ============= */
+.selection-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3) var(--space-8);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.1));
+    border-bottom: 1px solid var(--primary);
+}
+
+.selection-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.selection-actions {
+    display: flex;
+    gap: var(--space-2);
+}
+
+/* Selection checkbox on file cards */
+.file-select-checkbox {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    width: 24px;
+    height: 24px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    transition: all var(--transition-fast);
+}
+
+.file-select-checkbox:hover {
+    color: var(--primary);
+}
+
+.file-select-checkbox .checked {
+    display: none;
+    color: var(--primary);
+}
+
+.file-select-checkbox .unchecked {
+    display: block;
+}
+
+/* Show checkboxes in select mode */
+body.select-mode .file-select-checkbox {
+    display: flex;
+}
+
+body.select-mode .file-card .file-actions {
+    right: auto;
+    left: 32px;
+}
+
+/* Selected file card */
+.file-card.selected {
+    border-color: var(--primary);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.file-card.selected .file-select-checkbox .unchecked {
+    display: none;
+}
+
+.file-card.selected .file-select-checkbox .checked {
+    display: block;
+}
+
+/* Select mode button active */
+#selectModeBtn.active {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+}
+
 /* ============= Breadcrumbs ============= */
 .breadcrumbs {
     display: flex;

@@ -1,0 +1,36 @@
+# Environment and secrets
+.env
+*.session
+*.session-journal
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+
+# App runtime data
+uploads/*
+downloads/*
+!uploads/.gitkeep
+!downloads/.gitkeep
+cloud_metadata.db
+cloud_metadata_v2.db
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files (local only)
+*.txt
+verify_full_flow.py

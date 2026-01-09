@@ -1,0 +1,21 @@
+{
+    "name": "CloudVault",
+    "short_name": "CloudVault",
+    "description": "Unlimited Secure Cloud Storage",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#6366f1",
+    "icons": [
+        {
+            "src": "/static/logo.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/static/logo.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

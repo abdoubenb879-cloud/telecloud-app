@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify - TeleCloud</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1726377663312980"
+        crossorigin="anonymous"></script>
+</head>
+
+<body class="login-page">
+    <div class="glass-container auth-box">
+        <div class="brand">
+            <i class="fas fa-shield-alt logo-icon"></i>
+            <h1>Security Code</h1>
+            <p>Enter the verification code sent to <b>{{ phone }}</b></p>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i> {{ error }}
+        </div>
+        {% endif %}
+
+        <form action="/verify" method="POST" class="auth-form">
+            <input type="hidden" name="phone" value="{{ phone }}">
+
+            <div class="input-group">
+                <label for="code">Verification Code</label>
+                <div class="input-wrapper">
+                    <i class="fas fa-hashtag"></i>
+                    <input type="text" name="code" id="code" placeholder="12345" required autofocus>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-primary full-width">
+                Complete Login <i class="fas fa-check-circle"></i>
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p><a href="/login"><i class="fas fa-arrow-left"></i> Use a different number</a></p>
+        </div>
+    </div>
+</body>
+
+</html>

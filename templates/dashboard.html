@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudVault - Secure Cloud Storage</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ range(1, 10000) | random }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1726377663312980"
+        crossorigin="anonymous"></script>
+</head>
+
+<body>
+
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="CloudVault" class="sidebar-logo"
+                    style="width: 40px; height: 40px;">
+                <span class="sidebar-brand">CloudVault</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Storage</div>
+                    <a href="/" class="nav-item active">
+                        <i class="fas fa-folder"></i>
+                        <span>My Files</span>
+                    </a>
+                    <a href="/trash" class="nav-item">
+                        <i class="fas fa-trash-alt"></i>
+                        <span>Trash</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Account</div>
+                    <a href="/settings" class="nav-item">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-card" onclick="toggleUserMenu()">
+                    <div class="user-avatar">{{ username[0]|upper if username else 'U' }}</div>
+                    <div class="user-info">
+                        <div class="user-name">
+                            {{ username }}
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-up user-chevron"></i>
+                </div>
+
+                <div class="dropdown-menu" id="userMenu" style="bottom: 100%; top: auto; margin-bottom: 8px;">
+                    <a href="/settings" class="dropdown-item">
+                        <i class="fas fa-cog"></i> Settings
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="/logout" class="dropdown-item danger">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="content-header">
+                <div class="content-title">
+                    <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
+                        <i class="fas fa-bars"></i>
+                    </button>
+
+                    <nav class="breadcrumbs">
+                        <a href="/" class="breadcrumb-item">My Files</a>
+                        {% for crumb in breadcrumbs %}
+                        <span class="breadcrumb-separator">/</span>
+                        <a href="/?folder_id={{ crumb.id }}"
+                            class="breadcrumb-item {% if loop.last %}active{% endif %}">
+                            {{ crumb.name }}
+                        </a>
+                        {% endfor %}
+                    </nav>
+                </div>
+
+                <div class="flex gap-3">
+                    <button class="btn btn-secondary" onclick="openCreateFolderModal()">
+                        <i class="fas fa-folder-plus"></i>
+                        <span class="hide-mobile">New Folder</span>
+                    </button>
+                    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span class="hide-mobile">Upload</span>
+                    </button>
+                    <input type="file" id="fileInput" multiple hidden onchange="handleFileSelect(event)">
+                </div>
+            </header>
+
+            <!-- Content Body -->
+            <div class="content-body">
+                <!-- Upload Zone -->
+                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-zone-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <div class="upload-zone-title">Drop files here or click to upload</div>
+                    <div class="upload-zone-text">
+                        Maximum file size: 2GB
+                    </div>
+                </div>
+
+                <!-- Upload Progress -->
+                <div id="uploadProgress" class="card mt-6 hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="text-secondary">Uploading...</span>
+                        <span id="uploadPercent" class="text-primary">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Ad Banner -->
+                <div class="card mt-6" style="text-align: center; padding: 12px;">
+                    <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Advertisement</p>
+                    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-1726377663312980"
+                        data-ad-slot="7827162592" data-ad-format="auto" data-full-width-responsive="true"></ins>
+                    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+                </div>
+
+                <!-- Files Grid -->
+                <div class="mt-6">
+                    {% if files %}
+                    <div class="file-grid" id="fileGrid">
+                        {% for file in files %}
+                        <div class="file-card" data-id="{{ file.id if multi_user else file[0] }}"
+                            onclick="handleFileClick(event, {{ file.id if multi_user else file[0] }}, {{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }})">
+
+                            <div class="file-actions">
+                                <button class="btn btn-icon btn-sm btn-ghost"
+                                    onclick="event.stopPropagation(); openFileMenu({{ file.id if multi_user else file[0] }}, '{{ (file.filename if multi_user else file[1])|e }}')">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                            </div>
+
+                            <div class="file-preview">
+                                {% set filename = file.filename if multi_user else file[1] %}
+                                {% set is_folder = file.is_folder if multi_user else file[5] %}
+                                {% set file_id = file.id if multi_user else file[0] %}
+
+                                {% if is_folder %}
+                                <i class="file-icon fas fa-folder" style="color: #fbbf24;"></i>
+                                {% elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) %}
+                                <img src="/thumbnail/{{ file_id }}" alt="{{ filename }}" loading="lazy"
+                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <i class="file-icon fas fa-image" style="display:none;"></i>
+                                {% elif filename.lower().endswith(('.mp4', '.mov', '.webm', '.mkv')) %}
+                                <i class="file-icon fas fa-video" style="color: #ef4444;"></i>
+                                {% elif filename.lower().endswith(('.mp3', '.wav', '.ogg', '.m4a')) %}
+                                <i class="file-icon fas fa-music" style="color: #8b5cf6;"></i>
+                                {% elif filename.lower().endswith(('.pdf')) %}
+                                <i class="file-icon fas fa-file-pdf" style="color: #ef4444;"></i>
+                                {% elif filename.lower().endswith(('.doc', '.docx')) %}
+                                <i class="file-icon fas fa-file-word" style="color: #3b82f6;"></i>
+                                {% elif filename.lower().endswith(('.zip', '.rar', '.7z', '.tar')) %}
+                                <i class="file-icon fas fa-file-archive" style="color: #f59e0b;"></i>
+                                {% else %}
+                                <i class="file-icon fas fa-file"></i>
+                                {% endif %}
+                            </div>
+
+                            <div class="file-name" title="{{ filename }}">{{ filename }}</div>
+                            <div class="file-meta">
+                                {% if is_folder %}
+                                Folder
+                                {% else %}
+                                {% set size = file.total_size or file.file_size or file.size or (file[2] if file is
+                                sequence else 0) %}
+                                {{ "%.1f"|format((size or 0) / 1024 / 1024) }} MB
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <h3 class="empty-state-title">No files yet</h3>
+                        <p class="empty-state-text">Upload your first file to get started</p>
+                        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-cloud-upload-alt"></i> Upload Files
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- File Context Menu Modal -->
+    <div class="modal-overlay" id="fileMenuModal" onclick="closeFileMenu()">
+        <div class="modal-content" style="max-width: 280px; padding: var(--space-3);" onclick="event.stopPropagation()">
+            <div class="dropdown-item" onclick="previewFile(currentFileId)">
+                <i class="fas fa-eye"></i> Preview
+            </div>
+            <div class="dropdown-item" onclick="downloadFile(currentFileId)">
+                <i class="fas fa-download"></i> Download
+            </div>
+            <div class="dropdown-item" onclick="shareFile(currentFileId)">
+                <i class="fas fa-share-alt"></i> Share
+            </div>
+            <div class="dropdown-item" onclick="renameFile(currentFileId, currentFileName)">
+                <i class="fas fa-edit"></i> Rename
+            </div>
+            <div class="dropdown-divider"></div>
+            <div class="dropdown-item danger" onclick="deleteFile(currentFileId)">
+                <i class="fas fa-trash"></i> Move to Trash
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Folder Modal -->
+    <div class="modal-overlay" id="createFolderModal" onclick="closeCreateFolderModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 class="modal-title">Create New Folder</h3>
+                <button class="modal-close" onclick="closeCreateFolderModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form onsubmit="createFolder(event)">
+                <div class="form-group">
+                    <label class="form-label">Folder Name</label>
+                    <input type="text" id="folderNameInput" class="form-input" placeholder="My Folder" required>
+                </div>
+                <div class="flex gap-3 justify-end">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreateFolderModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- Loading Overlay -->
+    <div class="modal-overlay" id="loadingOverlay" style="background: rgba(0,0,0,0.9);">
+        <div class="flex flex-col items-center gap-4">
+            <div class="spinner spinner-lg"></div>
+            <p id="loadingText" class="text-secondary">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal-overlay" id="previewModal" onclick="closePreview()">
+        <div class="preview-modal-content" onclick="event.stopPropagation()">
+            <div class="preview-header">
+                <h3 id="previewFileName" class="preview-title">File Preview</h3>
+                <button class="modal-close" onclick="closePreview()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="preview-body" id="previewContent">
+                <div class="flex flex-col items-center gap-4">
+                    <div class="spinner spinner-lg"></div>
+                    <p class="text-secondary">Loading preview...</p>
+                </div>
+            </div>
+            <div class="preview-footer">
+                <button class="btn btn-secondary" onclick="closePreview()">Close</button>
+                <button class="btn btn-primary" id="previewDownloadBtn" onclick="downloadFile(currentFileId)">
+                    <i class="fas fa-download"></i> Download
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='modal.js') }}?v=5"></script>
+    <script>
+        // Global state
+        let currentFileId = null;
+        let currentFileName = null;
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        const currentFolderId = {{ folder_id or 'null' }};
+
+        // Sidebar toggle
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        // User menu
+        function toggleUserMenu() {
+            const menu = document.getElementById('userMenu');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // Close menus on outside click
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.user-card')) {
+                document.getElementById('userMenu').style.display = 'none';
+            }
+        });
+
+        // File click handler
+        function handleFileClick(event, fileId, isFolder) {
+            if (event.target.closest('.file-actions')) return;
+
+            if (isFolder) {
+                window.location.href = `/?folder_id=${fileId}`;
+            } else {
+                previewFile(fileId);
+            }
+        }
+
+        // File menu
+        function openFileMenu(fileId, fileName) {
+            currentFileId = fileId;
+            currentFileName = fileName;
+            document.getElementById('fileMenuModal').classList.add('active');
+        }
+
+        function closeFileMenu() {
+            document.getElementById('fileMenuModal').classList.remove('active');
+        }
+
+        // Create folder
+        function openCreateFolderModal() {
+            document.getElementById('createFolderModal').classList.add('active');
+            document.getElementById('folderNameInput').focus();
+        }
+
+        function closeCreateFolderModal() {
+            document.getElementById('createFolderModal').classList.remove('active');
+        }
+
+        async function createFolder(event) {
+            event.preventDefault();
+            const name = document.getElementById('folderNameInput').value.trim();
+            if (!name) return;
+
+            showLoading('Creating folder...');
+
+            try {
+                const formData = new FormData();
+                formData.append('name', name);
+                if (currentFolderId) formData.append('parent_id', currentFolderId);
+
+                const response = await fetch('/create_folder', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to create folder');
+                    hideLoading();
+                }
+            } catch (e) {
+                alert('Error creating folder');
+                hideLoading();
+            }
+        }
+
+        // Preview
+        async function previewFile(fileId) {
+            closeFileMenu();
+            currentFileId = fileId;
+
+            // Show modal with loading state
+            const modal = document.getElementById('previewModal');
+            const content = document.getElementById('previewContent');
+            const fileName = document.getElementById('previewFileName');
+
+            content.innerHTML = `
+                <div class="flex flex-col items-center gap-4">
+                    <div class="spinner spinner-lg"></div>
+                    <p class="text-secondary">Loading preview...</p>
+                </div>
+            `;
+            modal.classList.add('active');
+
+            try {
+                // Fetch file info to get filename and type
+                const response = await fetch(`/preview/${fileId}`);
+                const contentType = response.headers.get('content-type') || '';
+
+                // Get filename from Content-Disposition header or use generic
+                const disposition = response.headers.get('content-disposition');
+                let name = 'File Preview';
+                if (disposition) {
+                    const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    if (match && match[1]) {
+                        name = match[1].replace(/['"]/g, '');
+                    }
+                }
+                fileName.textContent = name;
+
+                if (contentType.startsWith('image/')) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    content.innerHTML = `<img src="${url}" alt="${name}" class="preview-image">`;
+                } else if (contentType.startsWith('video/')) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    content.innerHTML = `<video src="${url}" controls class="preview-video" autoplay></video>`;
+                } else if (contentType.startsWith('audio/')) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    content.innerHTML = `
+                        <div class="preview-audio">
+                            <i class="fas fa-music" style="font-size: 4rem; color: var(--primary); margin-bottom: 1rem;"></i>
+                            <audio src="${url}" controls autoplay></audio>
+                        </div>
+                    `;
+                } else if (contentType === 'application/pdf') {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    content.innerHTML = `<iframe src="${url}" class="preview-pdf"></iframe>`;
+                } else if (contentType.startsWith('text/')) {
+                    const text = await response.text();
+                    content.innerHTML = `<pre class="preview-text">${escapeHtml(text)}</pre>`;
+                } else {
+                    // Unsupported file type
+                    content.innerHTML = `
+                        <div class="flex flex-col items-center gap-4 text-center">
+                            <i class="fas fa-file" style="font-size: 4rem; color: var(--text-muted);"></i>
+                            <p class="text-secondary">Preview not available for this file type</p>
+                            <p class="text-muted" style="font-size: 0.85rem;">${contentType || 'Unknown type'}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                content.innerHTML = `
+                    <div class="flex flex-col items-center gap-4 text-center">
+                        <i class="fas fa-exclamation-circle" style="font-size: 4rem; color: var(--danger);"></i>
+                        <p class="text-secondary">Failed to load preview</p>
+                        <p class="text-muted" style="font-size: 0.85rem;">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function closePreview() {
+            document.getElementById('previewModal').classList.remove('active');
+            document.getElementById('previewContent').innerHTML = '';
+        }
+
+        // Download
+        function downloadFile(fileId) {
+            closeFileMenu();
+            showLoading('Preparing download...');
+            setTimeout(() => {
+                hideLoading();
+                window.location.href = `/download/${fileId}`;
+            }, 500); // Small delay for UX
+        }
+
+        // Share
+        async function shareFile(fileId) {
+            closeFileMenu();
+            showLoading('Generating share link...');
+
+            try {
+                const response = await fetch('/generate_share', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ file_id: fileId })
+                });
+
+                const data = await response.json();
+                hideLoading();
+
+                if (data.share_url) {
+                    await navigator.clipboard.writeText(data.share_url);
+                    await Modal.alert('Success', 'Share link copied to clipboard!');
+                } else {
+                    throw new Error('No URL returned');
+                }
+            } catch (e) {
+                hideLoading();
+                await Modal.alert('Error', 'Failed to generate share link');
+            }
+        }
+
+        // Rename
+        // Rename
+        async function renameFile(fileId, currentName) {
+            closeFileMenu();
+            const newName = await Modal.prompt('Rename File', 'Enter new name:', currentName || '');
+            if (!newName || newName === currentName) return;
+
+            showLoading('Renaming...');
+
+            try {
+                const response = await fetch('/rename', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ file_id: fileId, new_name: newName })
+                });
+
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    await Modal.alert('Error', 'Failed to rename file');
+                    hideLoading();
+                }
+            } catch (e) {
+                await Modal.alert('Error', 'An error occurred while renaming');
+                hideLoading();
+            }
+        }
+
+        // Refresh File Grid (AJAX)
+        async function refreshFileGrid() {
+            try {
+                const response = await fetch(`/api/files?folder_id=${currentFolderId || ''}`);
+                const data = await response.json();
+
+                if (data.files) {
+                    const grid = document.querySelector('.file-grid');
+                    const emptyState = document.querySelector('.empty-state');
+
+                    if (data.files.length === 0) {
+                        if (grid) grid.style.display = 'none';
+                        if (emptyState) emptyState.style.display = 'flex';
+                        return;
+                    }
+
+                    if (emptyState) emptyState.style.display = 'none';
+                    if (grid) {
+                        grid.style.display = 'grid';
+                        grid.innerHTML = data.files.map(file => `
+                            <div class="file-card" data-id="${file.id}" ondblclick="${file.is_folder ? `window.location.href='/?folder_id=${file.id}'` : `previewFile(${file.id})`}">
+                                <div class="file-preview">
+                                    ${file.is_folder ?
+                                '<i class="file-icon fas fa-folder" style="color: var(--primary);"></i>' :
+                                `<i class="file-icon fas ${getFileIcon(file.filename)}"></i>`
+                            }
+                                </div>
+                                <div class="file-info-row">
+                                    <div class="file-details">
+                                        <div class="file-name" title="${file.filename}">${file.filename}</div>
+                                        <div class="file-meta">
+                                            ${file.is_folder ? 'Folder' : formatSize(file.total_size)}
+                                            <span class="dot">•</span>
+                                            ${formatDate(file.created_at)}
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-icon btn-ghost" onclick="openFileMenu(${file.id}, '${file.filename.replace(/'/g, "\\'")}')">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to refresh file grid:', e);
+            }
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'pdf': 'fa-file-pdf',
+                'doc': 'fa-file-word', 'docx': 'fa-file-word',
+                'xls': 'fa-file-excel', 'xlsx': 'fa-file-excel',
+                'jpg': 'fa-file-image', 'jpeg': 'fa-file-image', 'png': 'fa-file-image', 'gif': 'fa-file-image',
+                'mp4': 'fa-file-video', 'mkv': 'fa-file-video', 'mov': 'fa-file-video',
+                'mp3': 'fa-file-audio', 'wav': 'fa-file-audio'
+            };
+            return icons[ext] || 'fa-file';
+        }
+
+        function formatSize(bytes) {
+            if (!bytes || bytes === 0) return '0.0 MB';
+            const mb = bytes / (1024 * 1024);
+            return mb.toFixed(1) + ' MB';
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'Recently';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString();
+        }
+
+        // Delete
+        async function deleteFile(fileId) {
+            closeFileMenu();
+            const confirmed = await Modal.confirm('Move to Trash?', 'This file will be moved to trash.', 'Move to Trash', 'Cancel', true);
+            if (!confirmed) return;
+
+            showLoading('Moving to trash...');
+
+            try {
+                const response = await fetch(`/delete/${fileId}`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+
+                if (response.ok) {
+                    document.querySelector(`[data-id="${fileId}"]`)?.remove();
+                    hideLoading();
+                } else {
+                    await Modal.alert('Error', 'Failed to delete file');
+                    hideLoading();
+                }
+            } catch (e) {
+                await Modal.alert('Error', 'An error occurred while deleting');
+                hideLoading();
+            }
+        }
+
+
+
+        // Loading overlay
+        function showLoading(text = 'Loading...') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        // File upload
+        const uploadZone = document.getElementById('uploadZone');
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                handleFiles(e.dataTransfer.files);
+            }
+        });
+
+        function handleFileSelect(event) {
+            if (event.target.files.length) {
+                handleFiles(event.target.files);
+            }
+        }
+
+        async function handleFiles(files) {
+            const progressContainer = document.getElementById('uploadProgress');
+            const progressFill = document.getElementById('progressFill');
+            const uploadPercent = document.getElementById('uploadPercent');
+
+            // Safe check for currentFolderId
+            const folderId = (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null;
+
+            for (const file of files) {
+                progressContainer.classList.remove('hidden');
+
+                // Check file size (2GB limit for everyone)
+                const maxSize = 2000 * 1024 * 1024;
+                if (file.size > maxSize) {
+                    await Modal.alert('Upload Error', `File ${file.name} too large. Max size: 2GB`);
+                    progressContainer.classList.add('hidden');
+                    continue;
+                }
+
+                // Chunked upload
+                const chunkSize = 10 * 1024 * 1024; // 10MB chunks
+                const totalChunks = Math.ceil(file.size / chunkSize);
+                const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+                for (let i = 0; i < totalChunks; i++) {
+                    const start = i * chunkSize;
+                    const end = Math.min(start + chunkSize, file.size);
+                    const chunk = file.slice(start, end);
+
+                    const formData = new FormData();
+                    formData.append('chunk', chunk);
+                    formData.append('upload_id', uploadId);
+                    formData.append('chunk_index', i);
+                    formData.append('total_chunks', totalChunks);
+                    formData.append('filename', file.name);
+
+                    try {
+                        const response = await fetch('/upload_chunk', {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': csrfToken },
+                            body: formData
+                        });
+
+                        if (!response.ok) throw new Error('Chunk upload failed');
+
+                        const percent = Math.round(((i + 1) / totalChunks) * 100);
+                        progressFill.style.width = percent + '%';
+                        uploadPercent.textContent = percent + '%';
+                    } catch (e) {
+                        await Modal.alert('Upload Failed', `Failed to upload ${file.name}. Please try again.`);
+                        progressContainer.classList.add('hidden');
+                        return;
+                    }
+                }
+
+                // Finalize upload
+                const finishData = new FormData();
+                finishData.append('upload_id', uploadId);
+                finishData.append('filename', file.name);
+                if (folderId) finishData.append('parent_id', folderId);
+
+                try {
+                    const res = await fetch('/upload_finish', {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrfToken },
+                        body: finishData
+                    });
+                    if (!res.ok) throw new Error('Finalize failed');
+
+                } catch (e) {
+                    await Modal.alert('Error', 'Failed to finalize upload');
+                    progressContainer.classList.add('hidden');
+                    return; // Exit if finalization fails for any file
+                }
+            }
+
+            // Success! Show countdown then refresh
+            progressContainer.classList.add('hidden');
+            Modal.countdown('Upload Complete!', 'Your files have been safely stored.', 3, () => {
+                location.reload();
+            });
+        }
+
+        // Hide loading on page load
+        hideLoading();
+    </script>
+</body>
+
+</html>

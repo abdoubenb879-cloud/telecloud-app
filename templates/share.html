@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download {{ filename }} - CloudVault</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1726377663312980"
+        crossorigin="anonymous"></script>
+    <style>
+        .share-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-6);
+        }
+
+        .share-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-2xl);
+            padding: var(--space-8);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .share-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-3);
+            margin-bottom: var(--space-6);
+        }
+
+        .share-logo img {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-md);
+        }
+
+        .share-logo span {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-light), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .file-preview-large {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto var(--space-5);
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-xl);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: var(--primary);
+        }
+
+        .file-info h2 {
+            font-size: 1.1rem;
+            margin-bottom: var(--space-2);
+            word-break: break-word;
+        }
+
+        .file-size {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: var(--space-6);
+        }
+
+        .ad-container {
+            background: var(--bg-tertiary);
+            border: 1px dashed var(--border);
+            border-radius: var(--radius-md);
+            padding: var(--space-4);
+            margin-bottom: var(--space-6);
+        }
+
+        .ad-label {
+            font-size: 0.7rem;
+            color: var(--text-disabled);
+            margin-bottom: var(--space-2);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="share-container">
+        <div class="share-card animate-slide-up">
+            <div class="share-logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="CloudVault">
+                <span>CloudVault</span>
+            </div>
+
+            <p class="text-secondary mb-6">Someone shared a file with you</p>
+
+            <div class="file-preview-large">
+                <i class="fas fa-file-download"></i>
+            </div>
+
+            <div class="file-info">
+                <h2>{{ filename }}</h2>
+                <p class="file-size">
+                    <span class="badge badge-primary">FILE</span>
+                    {{ (file_size / (1024*1024))|round(2) }} MB
+                </p>
+            </div>
+
+            <div class="ad-container">
+                <p class="ad-label">Sponsored</p>
+                <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-1726377663312980"
+                    data-ad-slot="2827162592" data-ad-format="auto" data-full-width-responsive="true"></ins>
+                <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+            </div>
+
+            <a href="{{ url_for('download_shared', token=token) }}" class="btn btn-primary btn-lg w-full"
+                style="text-decoration: none;">
+                <i class="fas fa-download"></i> Download File
+            </a>
+
+            <p class="text-muted mt-6" style="font-size: 0.8rem;">
+                Powered by CloudVault • Secure cloud storage
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

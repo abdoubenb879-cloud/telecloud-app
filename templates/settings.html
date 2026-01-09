@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - CloudVault</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ range(1, 10000) | random }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+</head>
+
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="CloudVault" class="sidebar-logo"
+                    style="width: 40px; height: 40px;">
+                <span class="sidebar-brand">CloudVault</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Storage</div>
+                    <a href="/" class="nav-item">
+                        <i class="fas fa-folder"></i>
+                        <span>My Files</span>
+                    </a>
+                    <a href="/trash" class="nav-item">
+                        <i class="fas fa-trash-alt"></i>
+                        <span>Trash</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Account</div>
+                    <a href="/settings" class="nav-item active">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-card" onclick="toggleUserMenu()">
+                    <div class="user-avatar">{{ username[0]|upper if username else 'U' }}</div>
+                    <div class="user-info">
+                        <div class="user-name">{{ username }}</div>
+                    </div>
+                    <i class="fas fa-chevron-up user-chevron"></i>
+                </div>
+
+                <div class="dropdown-menu" id="userMenu" style="bottom: 100%; top: auto; margin-bottom: 8px;">
+                    <a href="/settings" class="dropdown-item">
+                        <i class="fas fa-cog"></i> Settings
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="/logout" class="dropdown-item danger">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <div class="content-title">
+                    <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h2><i class="fas fa-cog" style="color: var(--primary); margin-right: 12px;"></i> Settings</h2>
+                </div>
+            </header>
+
+            <div class="content-body" style="max-width: 600px; margin: 0 auto;">
+                <!-- Account Profile Section -->
+                <section class="card mb-6">
+                    <h3 class="mb-4">Account Profile</h3>
+
+                    <!-- Username -->
+                    <div class="settings-field mb-4" id="usernameField">
+                        <label class="text-secondary"
+                            style="font-size: 0.85rem; display: block; margin-bottom: 4px;">Username</label>
+                        <div class="settings-value-row">
+                            <span class="settings-value" id="usernameValue">{{ username }}</span>
+                            <button class="btn btn-sm btn-ghost" onclick="editField('username')">
+                                <i class="fas fa-pen"></i> Edit
+                            </button>
+                        </div>
+                        <div class="settings-edit-row hidden" id="usernameEditRow">
+                            <input type="text" id="usernameInput" class="form-input" value="{{ username }}"
+                                placeholder="New username">
+                            <div class="flex gap-2 mt-2">
+                                <button class="btn btn-primary" onclick="saveField('username')">Save</button>
+                                <button class="btn btn-secondary" onclick="cancelEdit('username')">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Email -->
+                    <div class="settings-field mb-4" id="emailField">
+                        <label class="text-secondary"
+                            style="font-size: 0.85rem; display: block; margin-bottom: 4px;">Email Address</label>
+                        <div class="settings-value-row">
+                            <span class="settings-value" id="emailValue">{{ email }}</span>
+                            <button class="btn btn-sm btn-ghost" onclick="editField('email')">
+                                <i class="fas fa-pen"></i> Edit
+                            </button>
+                        </div>
+                        <div class="settings-edit-row hidden" id="emailEditRow">
+                            <input type="email" id="emailInput" class="form-input" value="{{ email }}"
+                                placeholder="New email">
+                            <div class="flex gap-2 mt-2">
+                                <button class="btn btn-primary" onclick="saveField('email')">Save</button>
+                                <button class="btn btn-secondary" onclick="cancelEdit('email')">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Password -->
+                    <div class="settings-field" id="passwordField">
+                        <label class="text-secondary"
+                            style="font-size: 0.85rem; display: block; margin-bottom: 4px;">Password</label>
+                        <div class="settings-value-row">
+                            <span class="settings-value" style="color: var(--text-muted);">••••••••</span>
+                            <button class="btn btn-sm btn-ghost" onclick="editField('password')">
+                                <i class="fas fa-key"></i> Change
+                            </button>
+                        </div>
+                        <div class="settings-edit-row hidden" id="passwordEditRow">
+                            <input type="password" id="oldPasswordInput" class="form-input mb-2"
+                                placeholder="Current password">
+                            <input type="password" id="passwordInput" class="form-input"
+                                placeholder="New password (min 8 characters)">
+                            <div class="flex gap-2 mt-2 items-center">
+                                <button class="btn btn-primary" onclick="saveField('password')">Update Password</button>
+                                <button class="btn btn-secondary" onclick="cancelEdit('password')">Cancel</button>
+                            </div>
+                            <a href="/forgot-password" class="text-sm text-primary mt-2"
+                                style="display: inline-block;">Forgot your password?</a>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Danger Zone -->
+                <section class="card" style="border-color: var(--danger-subtle);">
+                    <h3 class="mb-2 text-danger">Danger Zone</h3>
+                    <p class="text-secondary mb-4" style="font-size: 0.9rem;">
+                        Once you delete your account, there is no going back. All your files will be permanently
+                        deleted.
+                    </p>
+                    <button class="btn btn-danger" onclick="deleteAccount()">
+                        <i class="fas fa-trash"></i> Delete Account
+                    </button>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">
+        <span id="toastMsg"></span>
+    </div>
+
+    <style>
+        .settings-field {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .settings-field:last-child {
+            border-bottom: none;
+        }
+
+        .settings-value-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .settings-value {
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .settings-edit-row {
+            margin-top: 12px;
+        }
+
+        .settings-edit-row.hidden {
+            display: none;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--success);
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.hidden {
+            display: none;
+        }
+
+        .toast.error {
+            border-color: var(--danger);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+
+    <script src="{{ url_for('static', filename='modal.js') }}?v=5"></script>
+    <script>
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        function toggleUserMenu() {
+            const menu = document.getElementById('userMenu');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.user-card')) {
+                document.getElementById('userMenu').style.display = 'none';
+            }
+        });
+
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toastMsg');
+            msgEl.textContent = msg;
+            toast.classList.remove('hidden', 'error');
+            if (isError) toast.classList.add('error');
+            setTimeout(() => { toast.classList.add('hidden'); }, 3000);
+        }
+
+        function editField(field) {
+            // Hide value row, show edit row
+            const editRow = document.getElementById(`${field}EditRow`);
+            const valueRow = editRow.previousElementSibling;
+            valueRow.style.display = 'none';
+            editRow.classList.remove('hidden');
+
+            // Focus the input
+            const input = document.getElementById(`${field}Input`);
+            if (input) input.focus();
+        }
+
+        function cancelEdit(field) {
+            const editRow = document.getElementById(`${field}EditRow`);
+            const valueRow = editRow.previousElementSibling;
+            valueRow.style.display = 'flex';
+            editRow.classList.add('hidden');
+
+            // Reset password fields
+            if (field === 'password') {
+                document.getElementById('oldPasswordInput').value = '';
+                document.getElementById('passwordInput').value = '';
+            }
+        }
+
+        async function saveField(field) {
+            const input = document.getElementById(`${field}Input`);
+            const value = input.value.trim();
+
+            if (!value) {
+                showToast(`Please enter a ${field}`, true);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('field', field);
+            formData.append('value', value);
+
+            // For password, also send old password
+            if (field === 'password') {
+                const oldPassword = document.getElementById('oldPasswordInput').value;
+                if (!oldPassword) {
+                    showToast('Please enter your current password', true);
+                    return;
+                }
+                formData.append('old_password', oldPassword);
+            }
+
+            try {
+                const response = await fetch('/settings/update', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken },
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    showToast(data.message || 'Updated successfully');
+
+                    // Update displayed value
+                    if (field === 'username') {
+                        document.getElementById('usernameValue').textContent = value;
+                        document.querySelectorAll('.user-name').forEach(el => el.textContent = value);
+                    } else if (field === 'email') {
+                        document.getElementById('emailValue').textContent = value;
+                    }
+
+                    cancelEdit(field);
+                } else {
+                    showToast(data.error || 'Update failed', true);
+                }
+            } catch (e) {
+                showToast('An error occurred', true);
+            }
+        }
+
+        async function deleteAccount() {
+            const confirmed = await Modal.confirm(
+                'Delete Account?',
+                'Are you absolutely sure? All your files will be permanently deleted and this cannot be undone.',
+                'Yes, Delete My Account',
+                'Cancel',
+                true
+            );
+
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch('/settings/delete_account', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    await Modal.alert('Goodbye', data.message || 'Your account has been deleted.');
+                    window.location.href = '/login';
+                } else {
+                    showToast(data.error || 'Deletion failed', true);
+                }
+            } catch (e) {
+                showToast('An error occurred', true);
+            }
+        }
+    </script>
+</body>
+
+</html>

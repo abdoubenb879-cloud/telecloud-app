@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trash - CloudVault</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1726377663312980"
+        crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="CloudVault" class="sidebar-logo"
+                    style="width: 40px; height: 40px;">
+                <span class="sidebar-brand">CloudVault</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Storage</div>
+                    <a href="/" class="nav-item">
+                        <i class="fas fa-folder"></i>
+                        <span>My Files</span>
+                    </a>
+                    <a href="/trash" class="nav-item active">
+                        <i class="fas fa-trash-alt"></i>
+                        <span>Trash</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Account</div>
+                    <a href="/settings" class="nav-item">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-card" onclick="toggleUserMenu()">
+                    <div class="user-avatar">{{ username[0]|upper if username else 'U' }}</div>
+                    <div class="user-info">
+                        <div class="user-name">
+                            {{ username }}
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-up user-chevron"></i>
+                </div>
+
+                <div class="dropdown-menu" id="userMenu" style="bottom: 100%; top: auto; margin-bottom: 8px;">
+                    <a href="/settings" class="dropdown-item">
+                        <i class="fas fa-cog"></i> Settings
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="/logout" class="dropdown-item danger">
+                        <i class="fas fa-sign-out-alt"></i> Sign Out
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <div class="content-title">
+                    <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h2><i class="fas fa-trash-alt" style="color: var(--danger); margin-right: 12px;"></i> Trash</h2>
+                </div>
+
+                {% if files %}
+                <button class="btn btn-danger" onclick="emptyTrash()">
+                    <i class="fas fa-trash"></i>
+                    <span class="hide-mobile">Empty Trash</span>
+                </button>
+                {% endif %}
+            </header>
+
+            <div class="content-body">
+                <div class="alert alert-warning mb-6">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Files in trash will be permanently deleted after 30 days</span>
+                </div>
+
+                {% if files %}
+                <div class="file-grid">
+                    {% for file in files %}
+                    <div class="file-card" id="file-{{ file.id }}">
+                        <div class="file-preview">
+                            <i class="file-icon fas fa-file"></i>
+                        </div>
+                        <div class="file-name" title="{{ file.filename }}">{{ file.filename }}</div>
+                        <div class="file-meta">
+                            Deleted {{ file.deleted_at[:10] if file.deleted_at else 'recently' }}
+                        </div>
+                        <div class="flex gap-2 mt-4">
+                            <button class="btn btn-secondary btn-sm" style="flex: 1;"
+                                onclick="restoreFile({{ file.id }})">
+                                <i class="fas fa-undo"></i> Restore
+                            </button>
+                            <button class="btn btn-icon btn-sm btn-ghost" style="color: var(--danger);"
+                                onclick="permanentDelete({{ file.id }})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-trash-alt"></i>
+                    </div>
+                    <h3 class="empty-state-title">Trash is Empty</h3>
+                    <p class="empty-state-text">Files you delete will appear here for 30 days</p>
+                    <a href="/" class="btn btn-primary" style="text-decoration: none;">
+                        <i class="fas fa-arrow-left"></i> Back to Files
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='modal.js') }}?v=5"></script>
+    <script>
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        function toggleUserMenu() {
+            const menu = document.getElementById('userMenu');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // Close menu on outside click
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.user-card')) {
+                document.getElementById('userMenu').style.display = 'none';
+            }
+        });
+
+        async function restoreFile(fileId) {
+            try {
+                const response = await fetch(`/restore/${fileId}`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+                if (response.ok) {
+                    const card = document.getElementById(`file-${fileId}`);
+                    if (card) card.remove();
+                    if (!document.querySelector('.file-card')) location.reload();
+                    if (typeof Modal !== 'undefined' && Modal.alert) {
+                        await Modal.alert('Success', 'File restored successfully');
+                    } else {
+                        alert('File restored successfully');
+                    }
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Failed to restore file'));
+                }
+            } catch (e) {
+                console.error('Restore error:', e);
+                alert('An error occurred while restoring');
+            }
+        }
+
+        async function permanentDelete(fileId) {
+            // Fallback to native confirm if Modal not available
+            let confirmed;
+            if (typeof Modal !== 'undefined' && Modal.confirm) {
+                confirmed = await Modal.confirm('Permanently Delete?', 'This action cannot be undone. Are you sure?', 'Delete', 'Cancel', true);
+            } else {
+                confirmed = confirm('Permanently delete this file? This cannot be undone.');
+            }
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(`/delete/permanent/${fileId}`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+                if (response.ok) {
+                    const card = document.getElementById(`file-${fileId}`);
+                    if (card) card.remove();
+                    if (!document.querySelector('.file-card')) location.reload();
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Failed to delete file'));
+                }
+            } catch (e) {
+                console.error('Delete error:', e);
+                alert('An error occurred while deleting');
+            }
+        }
+
+        async function emptyTrash() {
+            const confirmed = await Modal.confirm('Empty Trash?', 'Permanently delete ALL files? This cannot be undone.', 'Empty Trash', 'Cancel', true);
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch('/trash/empty', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+                if (response.ok) location.reload();
+                else await Modal.alert('Error', 'Failed to empty trash');
+            } catch (e) {
+                await Modal.alert('Error', 'An error occurred');
+            }
+        }
+    </script>
+</body>
+
+</html>

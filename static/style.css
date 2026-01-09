@@ -456,6 +456,24 @@ a:hover {
     font-size: 0.8rem;
 }
 
+/* Button Group - Merge adjacent buttons */
+.btn-group {
+    display: inline-flex;
+}
+
+.btn-group .btn {
+    border-radius: 0;
+}
+
+.btn-group .btn:first-child {
+    border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.btn-group .btn:last-child {
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    border-left: 1px solid rgba(255,255,255,0.2);
+}
+
 /* ============= Form Elements ============= */
 .form-group {
     margin-bottom: var(--space-5);

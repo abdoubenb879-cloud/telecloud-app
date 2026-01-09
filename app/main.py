@@ -301,6 +301,31 @@ def create_folder():
         
     return redirect(url_for('index', folder_id=parent_id if parent_id else None))
 
+@app.route('/create_folder_ajax', methods=['POST'])
+@csrf.exempt
+def create_folder_ajax():
+    """Create folder and return its ID (for folder upload)."""
+    if Config.MULTI_USER and 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    name = request.form.get('name')
+    parent_id = request.form.get('parent_id')
+    parent_id = int(parent_id) if parent_id and parent_id != 'None' else None
+    
+    if not name:
+        return jsonify({"error": "Folder name required"}), 400
+    
+    try:
+        if Config.MULTI_USER:
+            folder_id = db.create_folder(session['user_id'], name, parent_id)
+        else:
+            folder_id = db.create_folder(name, parent_id)
+        
+        return jsonify({"status": "ok", "folder_id": folder_id})
+    except Exception as e:
+        print(f"[FOLDER] Error creating folder: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 
 @app.route('/login', methods=['GET', 'POST'])

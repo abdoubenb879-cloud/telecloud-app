@@ -471,7 +471,7 @@ a:hover {
 
 .btn-group .btn:last-child {
     border-radius: 0 var(--radius-md) var(--radius-md) 0;
-    border-left: 1px solid rgba(255,255,255,0.2);
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 /* ============= Form Elements ============= */
@@ -1228,7 +1228,7 @@ a:hover {
     margin-bottom: var(--space-6);
 }
 
-/* ============= Responsive ============= */
+/* ============= Responsive - Mobile & Android Fixes ============= */
 @media (max-width: 768px) {
     :root {
         --sidebar-width: 0px;
@@ -1237,14 +1237,46 @@ a:hover {
     .sidebar {
         transform: translateX(-100%);
         width: 280px;
+        box-shadow: var(--shadow-lg);
     }
 
     .sidebar.open {
         transform: translateX(0);
     }
 
+    /* Sidebar overlay when open */
+    .sidebar.open::after {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 280px;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: -1;
+    }
+
     .main-content {
         margin-left: 0;
+    }
+
+    .content-header {
+        padding: var(--space-3) var(--space-4);
+        flex-wrap: wrap;
+        gap: var(--space-3);
+    }
+
+    .content-title {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .breadcrumbs {
+        font-size: 0.8rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 200px;
     }
 
     .content-body {
@@ -1252,17 +1284,252 @@ a:hover {
     }
 
     .file-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        grid-template-columns: repeat(2, 1fr);
         gap: var(--space-3);
+    }
+
+    .file-card {
+        padding: var(--space-3);
+    }
+
+    .file-card .file-actions {
+        opacity: 1;
+        /* Always visible on mobile */
+    }
+
+    .file-preview {
+        aspect-ratio: 1;
+    }
+
+    .file-name {
+        font-size: 0.8rem;
+    }
+
+    .file-meta {
+        font-size: 0.7rem;
     }
 
     .mobile-menu-btn {
         display: flex !important;
     }
+
+    /* Larger touch targets */
+    .btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    .btn-sm {
+        min-height: 36px;
+        min-width: 36px;
+    }
+
+    .btn-icon {
+        width: 44px;
+        height: 44px;
+    }
+
+    /* Button text on mobile */
+    .hide-mobile {
+        display: none !important;
+    }
+
+    /* Upload zone smaller on mobile */
+    .upload-zone {
+        padding: var(--space-6);
+    }
+
+    .upload-zone-icon {
+        width: 48px;
+        height: 48px;
+        font-size: 1.2rem;
+    }
+
+    .upload-zone-title {
+        font-size: 0.95rem;
+    }
+
+    .upload-zone-text {
+        font-size: 0.8rem;
+    }
+
+    /* Modal adjustments */
+    .modal-content {
+        width: 95%;
+        max-height: 85vh;
+        padding: var(--space-5);
+    }
+
+    /* Preview modal full screen on mobile */
+    .preview-modal-content {
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    /* Button group stack on very small screens */
+    .btn-group {
+        flex-shrink: 0;
+    }
+
+    /* Nav items larger touch area */
+    .nav-item {
+        padding: var(--space-4);
+        min-height: 48px;
+    }
+
+    /* User card touch area */
+    .user-card {
+        padding: var(--space-4);
+        min-height: 56px;
+    }
+}
+
+/* Extra small screens (phones in portrait) */
+@media (max-width: 380px) {
+    .file-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .content-header {
+        padding: var(--space-3);
+    }
+
+    .breadcrumbs {
+        max-width: 150px;
+    }
 }
 
 .mobile-menu-btn {
     display: none;
+}
+
+/* ============= Success Celebration Animation ============= */
+.success-checkmark {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto;
+}
+
+.checkmark {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: block;
+    stroke-width: 2;
+    stroke: var(--success);
+    stroke-miterlimit: 10;
+    animation: checkmark-fill 0.4s ease-in-out 0.4s forwards, checkmark-scale 0.3s ease-in-out 0.9s both;
+}
+
+.checkmark-circle {
+    stroke-dasharray: 166;
+    stroke-dashoffset: 166;
+    stroke-width: 2;
+    stroke-miterlimit: 10;
+    stroke: var(--success);
+    fill: none;
+    animation: checkmark-stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.checkmark-check {
+    transform-origin: 50% 50%;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    stroke-width: 3;
+    animation: checkmark-stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+}
+
+@keyframes checkmark-stroke {
+    100% {
+        stroke-dashoffset: 0;
+    }
+}
+
+@keyframes checkmark-scale {
+
+    0%,
+    100% {
+        transform: none;
+    }
+
+    50% {
+        transform: scale3d(1.1, 1.1, 1);
+    }
+}
+
+@keyframes checkmark-fill {
+    100% {
+        box-shadow: inset 0 0 0 60px rgba(34, 197, 94, 0.1);
+    }
+}
+
+/* Countdown ring */
+.countdown-ring {
+    position: relative;
+    display: inline-block;
+}
+
+.countdown-ring svg {
+    transform: rotate(-90deg);
+}
+
+.countdown-number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Celebration particles */
+.celebration-particles {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    pointer-events: none;
+}
+
+.particle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--primary);
+    animation: particle-burst 0.8s ease-out var(--delay) forwards;
+    opacity: 0;
+}
+
+.particle:nth-child(2n) {
+    background: var(--success);
+}
+
+.particle:nth-child(3n) {
+    background: var(--accent);
+    width: 8px;
+    height: 8px;
+}
+
+.particle:nth-child(4n) {
+    background: var(--warning);
+    width: 6px;
+    height: 6px;
+}
+
+@keyframes particle-burst {
+    0% {
+        opacity: 1;
+        transform: translate(0, 0) scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(var(--x), var(--y)) scale(0);
+    }
 }
 
 /* ============= Auth Pages ============= */

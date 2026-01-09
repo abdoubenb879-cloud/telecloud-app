@@ -141,7 +141,7 @@ const Modal = {
     },
 
     /**
-     * Shows a countdown modal (cannot be closed by user easily)
+     * Shows a premium countdown modal with celebration animation
      * @param {string} title 
      * @param {string} message 
      * @param {number} seconds 
@@ -151,30 +151,74 @@ const Modal = {
         const modalId = 'modal-' + Date.now();
         const modalHtml = `
             <div class="modal-overlay active" id="${modalId}" style="z-index: 10000;">
-                <div class="modal-content animate-scale-up text-center" style="max-width: 350px;">
-                    <div class="mb-4">
-                        <i class="fas fa-check-circle" style="font-size: 3rem; color: var(--success);"></i>
+                <div class="modal-content animate-scale-up text-center" style="max-width: 380px; overflow: hidden; position: relative;">
+                    <!-- Celebration particles -->
+                    <div class="celebration-particles" id="particles-${modalId}">
+                        ${Array(12).fill().map((_, i) => `
+                            <div class="particle" style="--delay: ${i * 0.08}s; --x: ${Math.random() * 200 - 100}px; --y: ${Math.random() * -150 - 50}px;"></div>
+                        `).join('')}
                     </div>
-                    <h3 class="modal-title mb-2">${title}</h3>
-                    <p class="text-secondary mb-4">${message}</p>
-                    <div class="text-3xl font-bold text-primary mb-4" id="counter-${modalId}">${seconds}</div>
-                    <p class="text-muted text-sm">Refreshing automatically...</p>
+                    
+                    <!-- Animated checkmark -->
+                    <div class="success-checkmark mb-4">
+                        <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                            <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+                            <path class="checkmark-check" fill="none" d="m14.1 27.2l7.1 7.2 16.7-16.8"/>
+                        </svg>
+                    </div>
+                    
+                    <h3 class="modal-title mb-2" style="font-size: 1.4rem;">${title}</h3>
+                    <p class="text-secondary mb-4" style="font-size: 1rem;">${message}</p>
+                    
+                    <!-- Countdown ring -->
+                    <div class="countdown-ring mb-4" id="ring-${modalId}">
+                        <svg width="80" height="80" viewBox="0 0 80 80">
+                            <circle class="countdown-bg" cx="40" cy="40" r="36" fill="none" stroke="var(--border)" stroke-width="4"/>
+                            <circle class="countdown-progress" cx="40" cy="40" r="36" fill="none" stroke="var(--success)" stroke-width="4" 
+                                stroke-dasharray="226.2" stroke-dashoffset="0" style="transition: stroke-dashoffset 1s linear;"/>
+                        </svg>
+                        <span class="countdown-number" id="counter-${modalId}">${seconds}</span>
+                    </div>
+                    
+                    <button class="btn btn-ghost text-muted" id="skip-${modalId}" style="font-size: 0.85rem;">
+                        Skip <i class="fas fa-arrow-right" style="margin-left: 4px;"></i>
+                    </button>
                 </div>
             </div>
         `;
 
         document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        const modal = document.getElementById(modalId);
         const counterEl = document.getElementById(`counter-${modalId}`);
+        const progressCircle = modal.querySelector('.countdown-progress');
+        const skipBtn = document.getElementById(`skip-${modalId}`);
+        const circumference = 226.2;
 
         let remaining = seconds;
-        const interval = setInterval(() => {
+        let interval;
+
+        const complete = () => {
+            clearInterval(interval);
+            modal.classList.remove('active');
+            onComplete();
+        };
+
+        skipBtn.onclick = complete;
+
+        // Animate progress ring
+        progressCircle.style.strokeDashoffset = 0;
+
+        interval = setInterval(() => {
             remaining--;
             if (counterEl) counterEl.textContent = remaining;
 
+            // Update ring
+            const offset = circumference * (1 - remaining / seconds);
+            progressCircle.style.strokeDashoffset = offset;
+
             if (remaining <= 0) {
-                clearInterval(interval);
-                onComplete();
-                // Optionally remove modal here, but page reload will likely happen first
+                complete();
             }
         }, 1000);
     },

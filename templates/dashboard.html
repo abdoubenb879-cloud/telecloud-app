@@ -831,358 +831,381 @@
                     if (grid) {
                         grid.style.display = 'grid';
                         grid.innerHTML = data.files.map(file => `
-    <div class="file-card" data-id="${file.id}"
-        ondblclick="${file.is_folder ? `window.location.href='/?folder_id=${file.id}'` : `previewFile(${file.id})`}">
-        <div class="file-preview">
-            ${file.is_folder ?
-                                '<i class="file-icon fas fa-folder" style="color: var(--primary);"></i>' :
+                            <div class="file-card" data-id="${file.id}" 
+                                 onclick="handleFileClick(event, ${file.id}, ${file.is_folder})">
+                                <div class="file-preview">
+                                    ${file.is_folder ?
+                                '<i class="file-icon fas fa-folder" style="color: #fbbf24;"></i>' :
                                 `<i class="file-icon fas ${getFileIcon(file.filename)}"></i>`
                             }
-        </div>
-        <div class="file-info-row">
-            <div class="file-details">
-                <div class="file-name" title="${file.filename}">${file.filename}</div>
-                <div class="file-meta">
-                    ${file.is_folder ? 'Folder' : formatSize(file.total_size)}
-                    <span class="dot">•</span>
-                    ${formatDate(file.created_at)}
-                </div>
-            </div>
-            <button class="btn btn-icon btn-ghost" onclick="openFileMenu(${file.id}, '${file.filename.replace(/'/g, "
-                                \\'")}')">
-                        < i class= "fas fa-ellipsis-v" ></i >
-            </button >
-        </div >
-    </div >
-                            `).join('');
-    }
-    }
-    } catch (e) {
-    console.error('Failed to refresh file grid:', e);
-    }
-    }
-
-    function getFileIcon(filename) {
-    const ext = filename.split('.').pop().toLowerCase();
-    const icons = {
-    'pdf': 'fa-file-pdf',
-    'doc': 'fa-file-word', 'docx': 'fa-file-word',
-    'xls': 'fa-file-excel', 'xlsx': 'fa-file-excel',
-    'jpg': 'fa-file-image', 'jpeg': 'fa-file-image', 'png': 'fa-file-image', 'gif': 'fa-file-image',
-    'mp4': 'fa-file-video', 'mkv': 'fa-file-video', 'mov': 'fa-file-video',
-    'mp3': 'fa-file-audio', 'wav': 'fa-file-audio'
-    };
-    return icons[ext] || 'fa-file';
-    }
-
-    function formatSize(bytes) {
-    if (!bytes || bytes === 0) return '0.0 MB';
-    const mb = bytes / (1024 * 1024);
-    return mb.toFixed(1) + ' MB';
-    }
-
-    function formatDate(dateStr) {
-    if (!dateStr) return 'Recently';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString();
-    }
-
-    // Delete
-    async function deleteFile(fileId) {
-    closeFileMenu();
-    const confirmed = await Modal.confirm('Move to Trash?', 'This file will be moved to trash.', 'Move to Trash',
-    'Cancel', true);
-    if (!confirmed) return;
-
-    showLoading('Moving to trash...');
-
-    try {
-    const response = await fetch(`/ delete/${fileId}`, {
-    method: 'POST',
-                            headers: { 'X-CSRFToken': csrfToken }
-    });
-
-                    if (response.ok) {
-                        document.querySelector(`[data-id="${fileId}"]`)?.remove();
-                        hideLoading();
-                    } else {
-                        await Modal.alert('Error', 'Failed to delete file');
-                        hideLoading();
+                                </div>
+                                <div class="file-info-row">
+                                    <div class="file-details">
+                                        <div class="file-name" title="${file.filename}">${file.filename}</div>
+                                        <div class="file-meta">
+                                            ${file.is_folder ? 'Folder' : formatSize(file.total_size)}
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-icon btn-ghost" onclick="event.stopPropagation(); openFileMenu(${file.id}, '${file.filename.replace(/'/g, "\\'")}', ${file.is_folder})">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('');
                     }
-                } catch (e) {
-                    await Modal.alert('Error', 'An error occurred while deleting');
+                }
+            } catch (e) {
+                console.error('Failed to refresh file grid:', e);
+            }
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'pdf': 'fa-file-pdf',
+                'doc': 'fa-file-word', 'docx': 'fa-file-word',
+                'xls': 'fa-file-excel', 'xlsx': 'fa-file-excel',
+                'jpg': 'fa-file-image', 'jpeg': 'fa-file-image', 'png': 'fa-file-image', 'gif': 'fa-file-image',
+                'mp4': 'fa-file-video', 'mkv': 'fa-file-video', 'mov': 'fa-file-video',
+                'mp3': 'fa-file-audio', 'wav': 'fa-file-audio'
+            };
+            return icons[ext] || 'fa-file';
+        }
+
+        function formatSize(bytes) {
+            if (!bytes || bytes === 0) return '0.0 MB';
+            const mb = bytes / (1024 * 1024);
+            return mb.toFixed(1) + ' MB';
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'Recently';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString();
+        }
+
+        // Delete
+        async function deleteFile(fileId) {
+            closeFileMenu();
+            const confirmed = await Modal.confirm('Move to Trash?', 'This file will be moved to trash.', 'Move to Trash', 'Cancel', true);
+            if (!confirmed) return;
+
+            showLoading('Moving to trash...');
+
+            try {
+                const response = await fetch(`/delete/${fileId}`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+
+                if (response.ok) {
+                    document.querySelector(`[data-id="${fileId}"]`)?.remove();
+                    hideLoading();
+                } else {
+                    await Modal.alert('Error', 'Failed to delete file');
                     hideLoading();
                 }
+            } catch (e) {
+                await Modal.alert('Error', 'An error occurred while deleting');
+                hideLoading();
             }
+        }
 
 
 
-    // Loading overlay
-    function showLoading(text = 'Loading...') {
-                document.getElementById('loadingText').textContent = text;
-                document.getElementById('loadingOverlay').classList.add('active');
+        // Loading overlay
+        function showLoading(text = 'Loading...') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        // File upload
+        const uploadZone = document.getElementById('uploadZone');
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                handleFiles(e.dataTransfer.files);
             }
+        });
 
-            function hideLoading() {
-                document.getElementById('loadingOverlay').classList.remove('active');
+        function handleFileSelect(event) {
+            if (event.target.files.length) {
+                handleFiles(event.target.files);
             }
+        }
 
-            // File upload
-            const uploadZone = document.getElementById('uploadZone');
+        // Folder upload handler
+        async function handleFolderSelect(event) {
+            const files = Array.from(event.target.files);
+            if (!files.length) return;
 
-            uploadZone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadZone.classList.add('dragover');
-            });
+            const progressContainer = document.getElementById('uploadProgress');
+            const progressFill = document.getElementById('progressFill');
+            const uploadPercent = document.getElementById('uploadPercent');
+            const uploadStatus = document.getElementById('uploadStatus');
+            const uploadFileName = document.getElementById('uploadFileName');
 
-            uploadZone.addEventListener('dragleave', () => {
-                uploadZone.classList.remove('dragover');
-            });
+            progressContainer.classList.remove('hidden');
 
-            uploadZone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadZone.classList.remove('dragover');
-                if (e.dataTransfer.files.length) {
-                    handleFiles(e.dataTransfer.files);
+            // Get the root folder name from the first file's path
+            const rootFolderName = files[0].webkitRelativePath.split('/')[0];
+            uploadStatus.textContent = `Uploading folder: ${rootFolderName}`;
+
+            // Build folder structure from file paths
+            const folderCache = {}; // path -> folder_id
+            const baseFolderId = (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null;
+
+            // Create folder recursively and return its ID
+            async function ensureFolder(folderPath) {
+                if (!folderPath) return baseFolderId;
+                if (folderCache[folderPath]) return folderCache[folderPath];
+
+                const parts = folderPath.split('/');
+                const folderName = parts.pop();
+                const parentPath = parts.join('/');
+
+                // Ensure parent exists first
+                const parentId = await ensureFolder(parentPath);
+
+                // Create this folder
+                const formData = new FormData();
+                formData.append('name', folderName);
+                if (parentId) formData.append('parent_id', parentId);
+
+                try {
+                    const response = await fetch('/create_folder_ajax', {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrfToken },
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        folderCache[folderPath] = data.folder_id;
+                        return data.folder_id;
+                    }
+                } catch (e) {
+                    console.error('Failed to create folder:', folderPath, e);
                 }
-            });
 
-            function handleFileSelect(event) {
-                if (event.target.files.length) {
-                    handleFiles(event.target.files);
-                }
+                return parentId; // Fallback to parent if folder creation fails
             }
 
-            // Folder upload handler
-            async function handleFolderSelect(event) {
-                const files = Array.from(event.target.files);
-                if (!files.length) return;
+            // Upload files one by one
+            const totalFiles = files.length;
+            let uploadedCount = 0;
+            let failedCount = 0;
+            const maxSize = 2000 * 1024 * 1024; // 2GB
 
-                const progressContainer = document.getElementById('uploadProgress');
-                const progressFill = document.getElementById('progressFill');
-                const uploadPercent = document.getElementById('uploadPercent');
-                const uploadStatus = document.getElementById('uploadStatus');
-                const uploadFileName = document.getElementById('uploadFileName');
+            for (const file of files) {
+                const relativePath = file.webkitRelativePath;
+                const pathParts = relativePath.split('/');
+                pathParts.pop(); // Remove filename
+                const folderPath = pathParts.join('/');
 
-                progressContainer.classList.remove('hidden');
+                uploadFileName.textContent = relativePath;
+                uploadStatus.textContent = `Uploading (${uploadedCount + 1}/${totalFiles})`;
 
-                // Get the root folder name from the first file's path
-                const rootFolderName = files[0].webkitRelativePath.split('/')[0];
-                uploadStatus.textContent = `Uploading folder: ${rootFolderName}`;
+                // Skip files that are too large
+                if (file.size > maxSize) {
+                    console.warn(`Skipping ${file.name} - too large`);
+                    failedCount++;
+                    uploadedCount++;
+                    continue;
+                }
 
-                // Build folder structure from file paths
-                const folderCache = {}; // path -> folder_id
-                const baseFolderId = (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null;
+                // Skip empty files (directories often show as 0-byte files)
+                if (file.size === 0) {
+                    uploadedCount++;
+                    const overallPercent = Math.round((uploadedCount / totalFiles) * 100);
+                    progressFill.style.width = overallPercent + '%';
+                    uploadPercent.textContent = overallPercent + '%';
+                    continue;
+                }
 
-                // Create folder recursively and return its ID
-                async function ensureFolder(folderPath) {
-                    if (!folderPath) return baseFolderId;
-                    if (folderCache[folderPath]) return folderCache[folderPath];
+                // Ensure folder exists
+                const targetFolderId = await ensureFolder(folderPath);
 
-                    const parts = folderPath.split('/');
-                    const folderName = parts.pop();
-                    const parentPath = parts.join('/');
+                // Chunked upload
+                const chunkSize = 10 * 1024 * 1024;
+                const totalChunks = Math.ceil(file.size / chunkSize);
+                const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
 
-                    // Ensure parent exists first
-                    const parentId = await ensureFolder(parentPath);
+                let uploadSuccess = true;
 
-                    // Create this folder
+                for (let i = 0; i < totalChunks; i++) {
+                    const start = i * chunkSize;
+                    const end = Math.min(start + chunkSize, file.size);
+                    const chunk = file.slice(start, end);
+
                     const formData = new FormData();
-                    formData.append('name', folderName);
-                    if (parentId) formData.append('parent_id', parentId);
+                    formData.append('chunk', chunk);
+                    formData.append('upload_id', uploadId);
+                    formData.append('chunk_index', i);
+                    formData.append('total_chunks', totalChunks);
+                    formData.append('filename', file.name);
 
                     try {
-                        const response = await fetch('/create_folder_ajax', {
+                        const response = await fetch('/upload_chunk', {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': csrfToken },
+                            body: formData
+                        });
+                        if (!response.ok) throw new Error('Chunk failed');
+                    } catch (e) {
+                        console.error(`Failed to upload chunk for ${file.name}:`, e);
+                        uploadSuccess = false;
+                        failedCount++;
+                        break;
+                    }
+                }
+
+                if (uploadSuccess) {
+                    // Finalize upload
+                    const finishData = new FormData();
+                    finishData.append('upload_id', uploadId);
+                    finishData.append('filename', file.name);
+                    if (targetFolderId) finishData.append('parent_id', targetFolderId);
+
+                    try {
+                        await fetch('/upload_finish', {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': csrfToken },
+                            body: finishData
+                        });
+                    } catch (e) {
+                        console.error(`Failed to finalize ${file.name}:`, e);
+                        failedCount++;
+                    }
+                }
+
+                uploadedCount++;
+                const overallPercent = Math.round((uploadedCount / totalFiles) * 100);
+                progressFill.style.width = overallPercent + '%';
+                uploadPercent.textContent = overallPercent + '%';
+            }
+
+            progressContainer.classList.add('hidden');
+
+            if (failedCount > 0) {
+                await Modal.alert('Upload Complete', `Uploaded ${totalFiles - failedCount} of ${totalFiles} files. ${failedCount} files failed.`);
+            } else {
+                Modal.countdown('Folder Upload Complete!', `All ${totalFiles} files have been uploaded.`, 3, () => {
+                    location.reload();
+                });
+            }
+
+            // Reset the input so the same folder can be selected again
+            event.target.value = '';
+        }
+
+        async function handleFiles(files) {
+            const progressContainer = document.getElementById('uploadProgress');
+            const progressFill = document.getElementById('progressFill');
+            const uploadPercent = document.getElementById('uploadPercent');
+            const uploadStatus = document.getElementById('uploadStatus');
+            const uploadFileName = document.getElementById('uploadFileName');
+
+            // Safe check for currentFolderId
+            const folderId = (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null;
+            const totalFiles = files.length;
+            let uploadedCount = 0;
+
+            for (const file of files) {
+                progressContainer.classList.remove('hidden');
+                uploadStatus.textContent = totalFiles > 1 ? `Uploading (${uploadedCount + 1}/${totalFiles})` : 'Uploading...';
+                uploadFileName.textContent = file.name;
+
+                // Check file size (2GB limit for everyone)
+                const maxSize = 2000 * 1024 * 1024;
+                if (file.size > maxSize) {
+                    await Modal.alert('Upload Error', `File ${file.name} too large. Max size: 2GB`);
+                    progressContainer.classList.add('hidden');
+                    continue;
+                }
+
+                // Chunked upload
+                const chunkSize = 10 * 1024 * 1024; // 10MB chunks
+                const totalChunks = Math.ceil(file.size / chunkSize);
+                const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+                for (let i = 0; i < totalChunks; i++) {
+                    const start = i * chunkSize;
+                    const end = Math.min(start + chunkSize, file.size);
+                    const chunk = file.slice(start, end);
+
+                    const formData = new FormData();
+                    formData.append('chunk', chunk);
+                    formData.append('upload_id', uploadId);
+                    formData.append('chunk_index', i);
+                    formData.append('total_chunks', totalChunks);
+                    formData.append('filename', file.name);
+
+                    try {
+                        const response = await fetch('/upload_chunk', {
                             method: 'POST',
                             headers: { 'X-CSRFToken': csrfToken },
                             body: formData
                         });
 
-                        if (response.ok) {
-                            const data = await response.json();
-                            folderCache[folderPath] = data.folder_id;
-                            return data.folder_id;
-                        }
+                        if (!response.ok) throw new Error('Chunk upload failed');
+
+                        const percent = Math.round(((i + 1) / totalChunks) * 100);
+                        progressFill.style.width = percent + '%';
+                        uploadPercent.textContent = percent + '%';
                     } catch (e) {
-                        console.error('Failed to create folder:', folderPath, e);
-                    }
-
-                    return parentId; // Fallback to parent if folder creation fails
-                }
-
-                // Upload files one by one
-                const totalFiles = files.length;
-                let uploadedCount = 0;
-                let failedCount = 0;
-                const maxSize = 2000 * 1024 * 1024; // 2GB
-
-                for (const file of files) {
-                    const relativePath = file.webkitRelativePath;
-                    const pathParts = relativePath.split('/');
-                    pathParts.pop(); // Remove filename
-                    const folderPath = pathParts.join('/');
-
-                    uploadFileName.textContent = relativePath;
-                    uploadStatus.textContent = `Uploading (${uploadedCount + 1}/${totalFiles})`;
-
-                    // Skip files that are too large
-                    if (file.size > maxSize) {
-                        console.warn(`Skipping ${file.name} - too large`);
-                        failedCount++;
-                        uploadedCount++;
-                        continue;
-                    }
-
-                    // Skip empty files (directories often show as 0-byte files)
-                    if (file.size === 0) {
-                        uploadedCount++;
-                        const overallPercent = Math.round((uploadedCount / totalFiles) * 100);
-                        progressFill.style.width = overallPercent + '%';
-                        uploadPercent.textContent = overallPercent + '%';
-                        continue;
-                    }
-
-                    // Ensure folder exists
-                    const targetFolderId = await ensureFolder(folderPath);
-
-                    // Chunked upload
-                    const chunkSize = 10 * 1024 * 1024;
-                    const totalChunks = Math.ceil(file.size / chunkSize);
-                    const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-
-                    let uploadSuccess = true;
-
-                    for (let i = 0; i < totalChunks; i++) {
-                        const start = i * chunkSize; const end = Math.min(start + chunkSize, file.size);
-                        const chunk = file.slice(start, end); const formData = new FormData(); formData.append('chunk', chunk);
-                        formData.append('upload_id', uploadId); formData.append('chunk_index', i); formData.append('total_chunks',
-                            totalChunks); formData.append('filename', file.name); try {
-                                const response = await fetch('/upload_chunk', {
-                                    method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: formData
-                                }); if (!response.ok) throw new
-                                    Error('Chunk failed');
-                            } catch (e) {
-                                console.error(`Failed to upload chunk for ${file.name}:`, e);
-                                uploadSuccess = false; failedCount++; break;
-                            }
-                    } if (uploadSuccess) { // Finalize upload const finishData=new
-                        FormData(); finishData.append('upload_id', uploadId); finishData.append('filename', file.name); if
-                            (targetFolderId) finishData.append('parent_id', targetFolderId); try {
-                                await fetch('/upload_finish', {
-                                    method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: finishData
-                                });
-                            } catch (e) {
-                                console.error(`Failed to finalize ${file.name}:`, e); failedCount++;
-                            }
-                    } uploadedCount++; const
-                        overallPercent = Math.round((uploadedCount / totalFiles) * 100); progressFill.style.width = overallPercent + '%';
-                    uploadPercent.textContent = overallPercent + '%';
-                } progressContainer.classList.add('hidden'); if (failedCount >
-                    0) {
-                    await Modal.alert('Upload Complete', `Uploaded ${totalFiles - failedCount} of ${totalFiles} files.
-        ${failedCount} files failed.`);
-                } else {
-                    Modal.countdown('Folder Upload Complete!', `All ${totalFiles} files have been uploaded.`, 3, () => {
-                        location.reload();
-                    });
-                }
-
-                // Reset the input so the same folder can be selected again
-                event.target.value = '';
-            }
-
-            async function handleFiles(files) {
-                const progressContainer = document.getElementById('uploadProgress');
-                const progressFill = document.getElementById('progressFill');
-                const uploadPercent = document.getElementById('uploadPercent');
-                const uploadStatus = document.getElementById('uploadStatus');
-                const uploadFileName = document.getElementById('uploadFileName');
-
-                // Safe check for currentFolderId
-                const folderId = (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null;
-                const totalFiles = files.length;
-                let uploadedCount = 0;
-
-                for (const file of files) {
-                    progressContainer.classList.remove('hidden');
-                    uploadStatus.textContent = totalFiles > 1 ? `Uploading (${uploadedCount + 1}/${totalFiles})` : 'Uploading...';
-                    uploadFileName.textContent = file.name;
-
-                    // Check file size (2GB limit for everyone)
-                    const maxSize = 2000 * 1024 * 1024;
-                    if (file.size > maxSize) {
-                        await Modal.alert('Upload Error', `File ${file.name} too large. Max size: 2GB`);
-                        progressContainer.classList.add('hidden');
-                        continue;
-                    }
-
-                    // Chunked upload
-                    const chunkSize = 10 * 1024 * 1024; // 10MB chunks
-                    const totalChunks = Math.ceil(file.size / chunkSize);
-                    const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-
-                    for (let i = 0; i < totalChunks; i++) {
-                        const start = i * chunkSize;
-                        const end = Math.min(start + chunkSize, file.size);
-                        const chunk = file.slice(start, end);
-
-                        const formData = new FormData();
-                        formData.append('chunk', chunk);
-                        formData.append('upload_id', uploadId);
-                        formData.append('chunk_index', i);
-                        formData.append('total_chunks', totalChunks);
-                        formData.append('filename', file.name);
-
-                        try {
-                            const response = await fetch('/upload_chunk', {
-                                method: 'POST',
-                                headers: { 'X-CSRFToken': csrfToken },
-                                body: formData
-                            });
-
-                            if (!response.ok) throw new Error('Chunk upload failed');
-
-                            const percent = Math.round(((i + 1) / totalChunks) * 100);
-                            progressFill.style.width = percent + '%';
-                            uploadPercent.textContent = percent + '%';
-                        } catch (e) {
-                            await Modal.alert('Upload Failed', `Failed to upload ${file.name}. Please try again.`);
-                            progressContainer.classList.add('hidden');
-                            return;
-                        }
-                    }
-
-                    // Finalize upload
-                    const finishData = new FormData();
-                    finishData.append('upload_id', uploadId);
-                    finishData.append('filename', file.name);
-                    if (folderId) finishData.append('parent_id', folderId);
-
-                    try {
-                        const res = await fetch('/upload_finish', {
-                            method: 'POST',
-                            headers: { 'X-CSRFToken': csrfToken },
-                            body: finishData
-                        });
-                        if (!res.ok) throw new Error('Finalize failed');
-                    } catch (e) {
-                        await Modal.alert('Error', 'Failed to finalize upload');
+                        await Modal.alert('Upload Failed', `Failed to upload ${file.name}. Please try again.`);
                         progressContainer.classList.add('hidden');
                         return;
                     }
-
-                    uploadedCount++;
                 }
 
-                // Success! Show countdown then refresh
-                progressContainer.classList.add('hidden');
-                Modal.countdown('Upload Complete!', 'Your files have been safely stored.', 3, () => {
-                    location.reload();
-                });
+                // Finalize upload
+                const finishData = new FormData();
+                finishData.append('upload_id', uploadId);
+                finishData.append('filename', file.name);
+                if (folderId) finishData.append('parent_id', folderId);
+
+                try {
+                    const res = await fetch('/upload_finish', {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrfToken },
+                        body: finishData
+                    });
+                    if (!res.ok) throw new Error('Finalize failed');
+                } catch (e) {
+                    await Modal.alert('Error', 'Failed to finalize upload');
+                    progressContainer.classList.add('hidden');
+                    return;
+                }
+
+                uploadedCount++;
             }
 
-            // Hide loading on page load
-            hideLoading();
+            // Success! Show countdown then refresh
+            progressContainer.classList.add('hidden');
+            Modal.countdown('Upload Complete!', 'Your files have been safely stored.', 3, () => {
+                location.reload();
+            });
+        }
+
+        // Hide loading on page load
+        hideLoading();
     </script>
 </body>
 

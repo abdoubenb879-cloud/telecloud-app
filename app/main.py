@@ -630,6 +630,99 @@ def download_bulk():
         traceback.print_exc()
         return jsonify({"error": "Failed to create download"}), 500
 
+@app.route('/download/folder/<int:folder_id>')
+@rate_limit
+def download_folder(folder_id):
+    """Download entire folder as ZIP archive."""
+    import zipfile
+    from io import BytesIO
+    
+    if 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    user_id = session['user_id']
+    
+    try:
+        # Get folder info
+        folder = db.get_file(folder_id)
+        if not folder or str(folder.get('user_id')) != str(user_id):
+            return jsonify({"error": "Folder not found"}), 404
+        
+        folder_name = folder.get('filename', 'Folder')
+        
+        # Recursively get all files in folder
+        def get_files_recursive(parent_id, path=""):
+            files_list = []
+            items = db.list_files(user_id, parent_id)
+            
+            for item in items:
+                item_id = item['id'] if isinstance(item, dict) else item[0]
+                item_name = item['filename'] if isinstance(item, dict) else item[1]
+                is_folder = item.get('is_folder', False) if isinstance(item, dict) else item[5]
+                
+                if is_folder:
+                    # Recurse into subfolder
+                    subpath = f"{path}/{item_name}" if path else item_name
+                    files_list.extend(get_files_recursive(item_id, subpath))
+                else:
+                    files_list.append({
+                        'id': item_id,
+                        'name': item_name,
+                        'path': f"{path}/{item_name}" if path else item_name
+                    })
+            
+            return files_list
+        
+        files = get_files_recursive(folder_id)
+        
+        if not files:
+            return jsonify({"error": "Folder is empty"}), 400
+        
+        # Create ZIP
+        zip_buffer = BytesIO()
+        bot = get_bot_client()
+        bot.connect()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for file_info in files:
+                try:
+                    chunks = db.get_chunks(file_info['id'])
+                    if not chunks:
+                        continue
+                    
+                    # Download and merge chunks
+                    file_data = BytesIO()
+                    for chunk in chunks:
+                        msg_id = chunk['message_id'] if isinstance(chunk, dict) else chunk[3]
+                        chunk_path = bot.download_media(msg_id)
+                        if chunk_path and os.path.exists(chunk_path):
+                            with open(chunk_path, 'rb') as f:
+                                file_data.write(f.read())
+                            os.remove(chunk_path)
+                    
+                    # Add to ZIP with folder path
+                    file_data.seek(0)
+                    zip_file.writestr(file_info['path'], file_data.read())
+                    print(f"[FOLDER DL] Added {file_info['path']} to ZIP")
+                    
+                except Exception as e:
+                    print(f"[FOLDER DL] Error adding file {file_info['id']}: {e}")
+                    continue
+        
+        zip_buffer.seek(0)
+        
+        return send_file(
+            zip_buffer,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=f'{folder_name}.zip'
+        )
+        
+    except Exception as e:
+        print(f"[FOLDER DL] Error: {e}")
+        traceback.print_exc()
+        return jsonify({"error": "Failed to create folder download"}), 500
+
 @app.route('/settings')
 @rate_limit
 def settings_page():

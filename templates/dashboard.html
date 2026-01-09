@@ -195,7 +195,7 @@
 
                             <div class="file-actions">
                                 <button class="btn btn-icon btn-sm btn-ghost"
-                                    onclick="event.stopPropagation(); openFileMenu({{ file.id if multi_user else file[0] }}, '{{ (file.filename if multi_user else file[1])|e }}')">
+                                    onclick="event.stopPropagation(); openFileMenu({{ file.id if multi_user else file[0] }}, '{{ (file.filename if multi_user else file[1])|e }}', {{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }})">
                                     <i class="fas fa-ellipsis-v"></i>
                                 </button>
                             </div>
@@ -259,13 +259,17 @@
     <!-- File Context Menu Modal -->
     <div class="modal-overlay" id="fileMenuModal" onclick="closeFileMenu()">
         <div class="modal-content" style="max-width: 280px; padding: var(--space-3);" onclick="event.stopPropagation()">
-            <div class="dropdown-item" onclick="previewFile(currentFileId)">
+            <div class="dropdown-item" id="filePreviewBtn" onclick="previewFile(currentFileId)">
                 <i class="fas fa-eye"></i> Preview
             </div>
-            <div class="dropdown-item" onclick="downloadFile(currentFileId)">
+            <div class="dropdown-item" id="fileDownloadBtn" onclick="downloadFile(currentFileId)">
                 <i class="fas fa-download"></i> Download
             </div>
-            <div class="dropdown-item" onclick="shareFile(currentFileId)">
+            <div class="dropdown-item" id="folderDownloadBtn" style="display: none;"
+                onclick="downloadFolder(currentFileId)">
+                <i class="fas fa-download"></i> Download Folder
+            </div>
+            <div class="dropdown-item" id="fileShareBtn" onclick="shareFile(currentFileId)">
                 <i class="fas fa-share-alt"></i> Share
             </div>
             <div class="dropdown-item" onclick="renameFile(currentFileId, currentFileName)">
@@ -517,14 +521,57 @@
         }
 
         // File menu
-        function openFileMenu(fileId, fileName) {
+        let currentIsFolder = false;
+
+        function openFileMenu(fileId, fileName, isFolder = false) {
             currentFileId = fileId;
             currentFileName = fileName;
+            currentIsFolder = isFolder;
+
+            // Show/hide folder-specific options
+            const folderDownloadBtn = document.getElementById('folderDownloadBtn');
+            const fileDownloadBtn = document.getElementById('fileDownloadBtn');
+            const filePreviewBtn = document.getElementById('filePreviewBtn');
+            const fileShareBtn = document.getElementById('fileShareBtn');
+
+            if (folderDownloadBtn) folderDownloadBtn.style.display = isFolder ? 'flex' : 'none';
+            if (fileDownloadBtn) fileDownloadBtn.style.display = isFolder ? 'none' : 'flex';
+            if (filePreviewBtn) filePreviewBtn.style.display = isFolder ? 'none' : 'flex';
+            if (fileShareBtn) fileShareBtn.style.display = isFolder ? 'none' : 'flex';
+
             document.getElementById('fileMenuModal').classList.add('active');
         }
 
         function closeFileMenu() {
             document.getElementById('fileMenuModal').classList.remove('active');
+        }
+
+        // Download folder as ZIP
+        async function downloadFolder(folderId) {
+            closeFileMenu();
+            showLoading('Preparing folder for download...');
+
+            try {
+                const response = await fetch(`/download/folder/${folderId}`, {
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${currentFileName}.zip`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    hideLoading();
+                } else {
+                    throw new Error('Download failed');
+                }
+            } catch (e) {
+                hideLoading();
+                await Modal.alert('Error', 'Failed to download folder');
+            }
         }
 
         // Create folder

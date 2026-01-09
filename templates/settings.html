@@ -1,3 +1,4 @@
+{% if not is_ajax %}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -65,9 +66,11 @@
                 </div>
             </div>
         </aside>
-
+        {% endif %}
         <!-- Main Content -->
-        <main class="main-content">
+        <main class="main-content" id="main-content-area">
+            {% if not is_ajax %}
+            <!-- Header -->
             <header class="content-header">
                 <div class="content-title">
                     <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">

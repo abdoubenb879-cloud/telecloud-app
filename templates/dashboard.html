@@ -1,3 +1,4 @@
+{% if not is_ajax %}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -74,7 +75,8 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="main-content">
+        <main class="main-content" id="main-content-area">
+            {% endif %}
             <!-- Header -->
             <header class="content-header">
                 <div class="content-title">
@@ -186,7 +188,7 @@
                     {% if files %}
                     <div class="file-grid" id="fileGrid">
                         {% for file in files %}
-                        <div class="file-card" data-id="{{ file.id if multi_user else file[0] }}"
+                        <div class="file-card animate-scale-up" data-id="{{ file.id if multi_user else file[0] }}"
                             data-is-folder="{{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }}"
                             onclick="handleFileClick(event, {{ file.id if multi_user else file[0] }}, {{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }})">
 
@@ -344,10 +346,150 @@
         </div>
     </div>
 
+    {% if not is_ajax %}
+    <!-- Global Progress Notification Bar -->
+    <div id="globalProgressBar" class="global-progress-bar">
+        <div class="progress-header">
+            <div class="progress-title">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <span id="globalProgressTitle">Processing...</span>
+            </div>
+            <div class="progress-rate" id="globalProgressRate">0 KB/s</div>
+        </div>
+        <div class="progress-track">
+            <div id="globalProgressFill" class="progress-fill-global"></div>
+        </div>
+        <div class="progress-details">
+            <span id="globalProgressStatus">Wait...</span>
+            <span id="globalProgressPercent">0%</span>
+        </div>
+    </div>
+
+    <!-- Navigation Loading Bar -->
+    <div id="navLoadingBar" class="nav-loading-bar"></div>
+
     <script src="{{ url_for('static', filename='modal.js') }}?v=5"></script>
+    <script>
+        // SPA-lite Navigation Manager
+        async function navigateSPA(url, pushState = true) {
+            const navBar = document.getElementById('navLoadingBar');
+            const mainContent = document.getElementById('main-content-area');
+
+            navBar.style.width = '30%';
+
+            try {
+                const response = await fetch(url + (url.includes('?') ? '&' : '?') + 'ajax=true', {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+
+                if (!response.ok) throw new Error('Navigation failed');
+
+                navBar.style.width = '70%';
+                const html = await response.text();
+
+                // Fade out current content
+                const oldContent = mainContent.querySelector('.content-body');
+                if (oldContent) oldContent.classList.add('fade-out');
+
+                setTimeout(() => {
+                    // Update content
+                    mainContent.innerHTML = html;
+
+                    // Fade in new content
+                    const newContent = mainContent.querySelector('.content-body');
+                    if (newContent) {
+                        newContent.classList.add('fade-in');
+                    }
+
+                    // Update URL and history
+                    if (pushState) {
+                        window.history.pushState({ url }, '', url);
+                    }
+
+                    // Update Active Nav Item
+                    updateActiveNavItem(url);
+
+                    navBar.style.width = '100%';
+                    setTimeout(() => { navBar.style.width = '0'; }, 300);
+                }, 250);
+
+            } catch (error) {
+                console.error('SPA Navigation Error:', error);
+                window.location.href = url; // Fallback to full reload
+            }
+        }
+
+        function updateActiveNavItem(url) {
+            const path = new URL(url, window.location.origin).pathname;
+            document.querySelectorAll('.nav-item').forEach(item => {
+                const itemPath = new URL(item.href, window.location.origin).pathname;
+                if (path === itemPath) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+        // Handle browser Back/Forward
+        window.addEventListener('popstate', (e) => {
+            if (e.state && e.state.url) {
+                navigateSPA(e.state.url, false);
+            } else {
+                window.location.reload();
+            }
+        });
+
+        // Intercept sidebar clicks
+        document.querySelectorAll('.sidebar-nav a, .dropdown-item').forEach(link => {
+            link.addEventListener('click', (e) => {
+                const url = link.getAttribute('href');
+                if (url && !url.startsWith('http') && !url.startsWith('#') && !url.includes('logout')) {
+                    e.preventDefault();
+                    navigateSPA(url);
+                    // Close mobile sidebar if open
+                    document.getElementById('sidebar').classList.remove('open');
+                }
+            });
+        });
+
+        // Global Upload Controller
+        const GlobalUpload = {
+            activeThreads: 0,
+            updateProgress(percent, rate, status, filename) {
+                const bar = document.getElementById('globalProgressBar');
+                const fill = document.getElementById('globalProgressFill');
+                const rateEl = document.getElementById('globalProgressRate');
+                const statusEl = document.getElementById('globalProgressStatus');
+                const percentEl = document.getElementById('globalProgressPercent');
+                const titleEl = document.getElementById('globalProgressTitle');
+
+                bar.classList.add('active');
+                fill.style.width = percent + '%';
+                rateEl.textContent = rate;
+                statusEl.textContent = status;
+                percentEl.textContent = percent + '%';
+                titleEl.textContent = filename ? `Uploading: ${filename}` : 'Uploading files...';
+
+                if (percent >= 100) {
+                    setTimeout(() => {
+                        this.activeThreads--;
+                        if (this.activeThreads <= 0) {
+                            bar.classList.remove('active');
+                            this.activeThreads = 0;
+                        }
+                    }, 3000);
+                }
+            }
+        };
+
+        // ... existing JS will be modified to use GlobalUpload ...
+        // (Removing verbatim repeat for brevity, I will apply precise fixes to existing script)
+    </script>
     <script>
         // Global state
         let currentFileId = null;
+        {% endif %}
         let currentFileName = null;
         const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
         const currentFolderId = {{ folder_id or 'null' }};
@@ -553,7 +695,8 @@
                     });
                 }
                 hideLoading();
-                location.reload();
+                refreshFileGrid();
+                cancelSelection();
             } catch (e) {
                 hideLoading();
                 await Modal.alert('Error', 'Failed to delete some files');
@@ -590,7 +733,7 @@
             }
 
             if (isFolder) {
-                window.location.href = `/?folder_id=${fileId}`;
+                navigateSPA(`/?folder_id=${fileId}`);
             } else {
                 previewFile(fileId);
             }
@@ -681,7 +824,9 @@
                 });
 
                 if (response.ok) {
-                    location.reload();
+                    refreshFileGrid();
+                    closeCreateFolderModal();
+                    hideLoading();
                 } else {
                     alert('Failed to create folder');
                     hideLoading();
@@ -873,7 +1018,8 @@
                 });
 
                 if (response.ok) {
-                    location.reload();
+                    refreshFileGrid();
+                    hideLoading();
                 } else {
                     await Modal.alert('Error', 'Failed to rename file');
                     hideLoading();
@@ -1033,7 +1179,8 @@
             const uploadStatus = document.getElementById('uploadStatus');
             const uploadFileName = document.getElementById('uploadFileName');
 
-            progressContainer.classList.remove('hidden');
+            progressContainer.classList.add('hidden'); // Use global instead
+            GlobalUpload.activeThreads++;
 
             // Get the root folder name from the first file's path
             const rootFolderName = files[0].webkitRelativePath.split('/')[0];
@@ -1106,8 +1253,7 @@
                 if (file.size === 0) {
                     uploadedCount++;
                     const overallPercent = Math.round((uploadedCount / totalFiles) * 100);
-                    progressFill.style.width = overallPercent + '%';
-                    uploadPercent.textContent = overallPercent + '%';
+                    GlobalUpload.updateProgress(overallPercent, 'Skipping', 'Processing folder structure...', file.name);
                     continue;
                 }
 
@@ -1134,12 +1280,24 @@
                     formData.append('filename', file.name);
 
                     try {
+                        const chunkStart = Date.now();
                         const response = await fetch('/upload_chunk', {
                             method: 'POST',
                             headers: { 'X-CSRFToken': csrfToken },
                             body: formData
                         });
                         if (!response.ok) throw new Error('Chunk failed');
+
+                        const chunkTime = (Date.now() - chunkStart) / 1000;
+                        const rate = chunkTime > 0 ? (chunk.size / 1024 / chunkTime).toFixed(1) : '...';
+                        const overallPercent = Math.round(((uploadedCount * 10 + i + 1) / (totalFiles * 10)) * 100); // Simplified ratio
+
+                        GlobalUpload.updateProgress(
+                            overallPercent,
+                            `${rate} KB/s`,
+                            `Folder Upload: ${uploadedCount + 1}/${totalFiles}`,
+                            file.name
+                        );
                     } catch (e) {
                         console.error(`Failed to upload chunk for ${file.name}:`, e);
                         uploadSuccess = false;
@@ -1169,8 +1327,7 @@
 
                 uploadedCount++;
                 const overallPercent = Math.round((uploadedCount / totalFiles) * 100);
-                progressFill.style.width = overallPercent + '%';
-                uploadPercent.textContent = overallPercent + '%';
+                GlobalUpload.updateProgress(overallPercent, 'Next file', `Completed ${uploadedCount}/${totalFiles}`, file.name);
             }
 
             progressContainer.classList.add('hidden');
@@ -1178,8 +1335,9 @@
             if (failedCount > 0) {
                 await Modal.alert('Upload Complete', `Uploaded ${totalFiles - failedCount} of ${totalFiles} files. ${failedCount} files failed.`);
             } else {
+                GlobalUpload.updateProgress(100, 'Done', 'Folder uploaded!', rootFolderName);
                 Modal.countdown('Folder Upload Complete!', `All ${totalFiles} files have been uploaded.`, 3, () => {
-                    location.reload();
+                    if (window.location.pathname === '/') refreshFileGrid();
                 });
             }
 
@@ -1188,27 +1346,29 @@
         }
 
         async function handleFiles(files) {
-            const progressContainer = document.getElementById('uploadProgress');
-            const progressFill = document.getElementById('progressFill');
-            const uploadPercent = document.getElementById('uploadPercent');
-            const uploadStatus = document.getElementById('uploadStatus');
-            const uploadFileName = document.getElementById('uploadFileName');
+            // GlobalUpload init
+            GlobalUpload.activeThreads++;
+            const totalFiles = files.length;
+            let uploadedCount = 0;
+            let startTime = Date.now();
+            let totalUploadedSize = 0;
 
             // Safe check for currentFolderId
             const folderId = (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null;
-            const totalFiles = files.length;
-            let uploadedCount = 0;
 
             for (const file of files) {
-                progressContainer.classList.remove('hidden');
-                uploadStatus.textContent = totalFiles > 1 ? `Uploading (${uploadedCount + 1}/${totalFiles})` : 'Uploading...';
-                uploadFileName.textContent = file.name;
+                const filename = file.name;
+                GlobalUpload.updateProgress(
+                    Math.round((uploadedCount / totalFiles) * 100),
+                    'Starting...',
+                    `Uploading ${uploadedCount + 1}/${totalFiles}`,
+                    filename
+                );
 
                 // Check file size (2GB limit for everyone)
                 const maxSize = 2000 * 1024 * 1024;
                 if (file.size > maxSize) {
                     await Modal.alert('Upload Error', `File ${file.name} too large. Max size: 2GB`);
-                    progressContainer.classList.add('hidden');
                     continue;
                 }
 
@@ -1218,6 +1378,7 @@
                 const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
 
                 for (let i = 0; i < totalChunks; i++) {
+                    const chunkStart = Date.now();
                     const start = i * chunkSize;
                     const end = Math.min(start + chunkSize, file.size);
                     const chunk = file.slice(start, end);
@@ -1238,12 +1399,22 @@
 
                         if (!response.ok) throw new Error('Chunk upload failed');
 
-                        const percent = Math.round(((i + 1) / totalChunks) * 100);
-                        progressFill.style.width = percent + '%';
-                        uploadPercent.textContent = percent + '%';
+                        // Update global progress
+                        const chunkTime = (Date.now() - chunkStart) / 1000;
+                        const rate = chunkTime > 0 ? (chunk.size / 1024 / chunkTime).toFixed(1) : '...';
+                        totalUploadedSize += chunk.size;
+                        const overallPercent = Math.round(((uploadedCount * totalChunks + i + 1) / (totalFiles * totalChunks)) * 100);
+
+                        GlobalUpload.updateProgress(
+                            overallPercent,
+                            `${rate} KB/s`,
+                            `File ${uploadedCount + 1}/${totalFiles}`,
+                            filename
+                        );
+
                     } catch (e) {
+                        GlobalUpload.activeThreads--;
                         await Modal.alert('Upload Failed', `Failed to upload ${file.name}. Please try again.`);
-                        progressContainer.classList.add('hidden');
                         return;
                     }
                 }
@@ -1263,22 +1434,30 @@
                     if (!res.ok) throw new Error('Finalize failed');
                 } catch (e) {
                     await Modal.alert('Error', 'Failed to finalize upload');
-                    progressContainer.classList.add('hidden');
                     return;
                 }
 
                 uploadedCount++;
             }
 
-            // Success! Show countdown then refresh
-            progressContainer.classList.add('hidden');
+            // Success! 
+            GlobalUpload.updateProgress(100, 'Done', 'Upload complete!', 'Finished');
             Modal.countdown('Upload Complete!', 'Your files have been safely stored.', 3, () => {
-                location.reload();
+                if (window.location.pathname === '/') refreshFileGrid();
             });
         }
 
         // Hide loading on page load
         hideLoading();
+
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(reg => console.log('SW Registered', reg))
+                    .catch(err => console.log('SW Fail', err));
+            });
+        }
     </script>
 </body>
 

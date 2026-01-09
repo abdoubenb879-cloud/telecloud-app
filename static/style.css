@@ -1746,3 +1746,138 @@ padding-left: 44px;
 .animate-scale-up {
     animation: scaleUp 0.3s ease forwards;
 }
+
+/* ============= Global Progress Notification Bar ============= */
+.global-progress-bar {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(150%);
+    width: 90%;
+    max-width: 450px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-4);
+    box-shadow: var(--shadow-lg), 0 0 30px rgba(99, 102, 241, 0.2);
+    z-index: 2000;
+    transition: transform var(--transition-slow) cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.global-progress-bar.active {
+    transform: translateX(-50%) translateY(0);
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-1);
+}
+
+.progress-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.progress-title i {
+    color: var(--primary-light);
+    animation: bounce soft-bounce 2s infinite;
+}
+
+@keyframes soft-bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-2px);
+    }
+}
+
+.progress-rate {
+    font-size: 0.75rem;
+    color: var(--primary-light);
+    font-family: monospace;
+    font-weight: 600;
+}
+
+.progress-track {
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.progress-fill-global {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    width: 0%;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.progress-details {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+}
+
+/* SPA-lite Transitions */
+.main-content {
+    position: relative;
+    overflow-x: hidden;
+}
+
+.content-body {
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.content-body.fade-out {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+.content-body.fade-in {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Loading Bar for AJAX nav */
+.nav-loading-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    z-index: 10000;
+    width: 0;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+/* Mobile specific tweaks */
+@media (max-width: 768px) {
+    .global-progress-bar {
+        bottom: 1rem;
+        width: 100%;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        left: 0;
+        transform: translateY(150%);
+        max-width: none;
+    }
+
+    .global-progress-bar.active {
+        transform: translateY(0);
+    }
+}

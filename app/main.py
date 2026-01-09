@@ -274,13 +274,19 @@ def index():
             breadcrumbs = db.get_breadcrumbs(current_folder_id)
             storage_name = "My Cloud Storage"
             
-        return render_template('dashboard.html', 
-                               files=files, 
-                               storage_name=storage_name, 
-                               multi_user=Config.MULTI_USER,
-                               breadcrumbs=breadcrumbs,
-                               current_folder_id=current_folder_id,
-                               username=session.get('username', 'User'))
+        render_params = {
+            "files": files,
+            "storage_name": storage_name,
+            "multi_user": Config.MULTI_USER,
+            "breadcrumbs": breadcrumbs,
+            "current_folder_id": current_folder_id,
+            "username": session.get('username', 'User')
+        }
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('ajax') == 'true':
+            return render_template('dashboard.html', is_ajax=True, **render_params)
+
+        return render_template('dashboard.html', **render_params)
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -605,11 +611,12 @@ def download_folder(folder_id):
             items = db.list_files(user_id, parent_id)
             
             for item in items:
-                item_id = item['id'] if isinstance(item, dict) else item[0]
-                item_name = item['filename'] if isinstance(item, dict) else item[1]
-                is_folder = item.get('is_folder', False) if isinstance(item, dict) else item[5]
+                # Support both dict and sqlite3.Row via key access
+                item_id = item['id']
+                item_name = item['filename']
+                is_folder_item = item['is_folder']
                 
-                if is_folder:
+                if is_folder_item:
                     # Recurse into subfolder
                     subpath = f"{path}/{item_name}" if path else item_name
                     files_list.extend(get_files_recursive(item_id, subpath))
@@ -684,10 +691,17 @@ def settings_page():
     if not user:
         return redirect(url_for('login'))
         
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('ajax') == 'true':
+        return render_template('settings.html', 
+                             is_ajax=True,
+                             user=user,
+                             username=session.get('username'), 
+                             email=session.get('email'))
+                             
     return render_template('settings.html', 
-                          user=user,
-                          username=session.get('username'),
-                          email=session.get('email'))
+                         user=user,
+                         username=session.get('username'), 
+                         email=session.get('email'))
 
 @app.route('/settings/update', methods=['POST'])
 @rate_limit
@@ -1257,10 +1271,17 @@ def trash():
     trashed_files = db.get_trash(user_id)
     is_premium = session.get('is_premium', False)
     
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('ajax') == 'true':
+        return render_template('trash.html', 
+                             is_ajax=True,
+                             files=trashed_files, 
+                             is_premium=is_premium,
+                             username=session.get('username'))
+                             
     return render_template('trash.html', 
-                          files=trashed_files, 
-                          is_premium=is_premium,
-                          username=session.get('username'))
+                         files=trashed_files, 
+                         is_premium=is_premium,
+                         username=session.get('username'))
 
 @app.route('/restore/<int:file_id>', methods=['POST'])
 @csrf.exempt
@@ -1386,10 +1407,10 @@ def shared_file_page(token):
         if not file_info:
             return render_template('error.html', message="This share link is invalid or has expired.", error_code="404"), 404
         
-        filename = file_info['filename'] if isinstance(file_info, dict) else file_info[1]
-        file_id = file_info['id'] if isinstance(file_info, dict) else file_info[0]
-        file_size = file_info.get('total_size', 0) if isinstance(file_info, dict) else 0
-        is_folder = file_info.get('is_folder', False) if isinstance(file_info, dict) else False
+        filename = file_info['filename']
+        file_id = file_info['id']
+        file_size = file_info['total_size']
+        is_folder = file_info['is_folder']
         
         return render_template('share.html', 
                              filename=filename, 
@@ -1408,10 +1429,11 @@ def download_shared(token):
         if not file_info:
             return "Invalid or expired share link", 404
         
-        file_id = file_info['id'] if isinstance(file_info, dict) else file_info[0]
-        filename = file_info['filename'] if isinstance(file_info, dict) else file_info[1]
-        is_folder = file_info.get('is_folder', False) if isinstance(file_info, dict) else False
-        user_id = file_info.get('user_id') if isinstance(file_info, dict) else 'local'
+        file_id = file_info['id']
+        filename = file_info['filename']
+        is_folder = file_info['is_folder']
+        # user_id is only in cloud DB, local uses 'local'
+        user_id = file_info['user_id'] if 'user_id' in file_info.keys() else 'local'
         
         if is_folder:
             # Handle Folder Download (ZIP)
@@ -1422,9 +1444,9 @@ def download_shared(token):
                 files_list = []
                 items = db.list_files(user_id, parent_id)
                 for item in items:
-                    i_id = item['id'] if isinstance(item, dict) else item[0]
-                    i_name = item['filename'] if isinstance(item, dict) else item[1]
-                    i_folder = item.get('is_folder', False) if isinstance(item, dict) else item[5]
+                    i_id = item['id']
+                    i_name = item['filename']
+                    i_folder = item['is_folder']
                     
                     if i_folder:
                         subpath = f"{path}/{i_name}" if path else i_name
@@ -1451,7 +1473,7 @@ def download_shared(token):
                         if not chunks: continue
                         cdat = BytesIO()
                         for chunk in chunks:
-                            mid = chunk['message_id'] if isinstance(chunk, dict) else chunk[3]
+                            mid = chunk['message_id']
                             cp = bot.download_media(mid)
                             if cp and os.path.exists(cp):
                                 with open(cp, 'rb') as f: cdat.write(f.read())
@@ -1480,7 +1502,7 @@ def download_shared(token):
         bot.connect()
         try:
             for chunk in chunks:
-                msg_id = chunk['message_id'] if isinstance(chunk, dict) else chunk[3]
+                msg_id = chunk['message_id']
                 chunk_path = bot.download_media(msg_id)
                 if chunk_path:
                     downloaded_chunks.append(chunk_path)

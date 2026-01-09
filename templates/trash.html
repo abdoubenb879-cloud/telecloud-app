@@ -1,3 +1,4 @@
+{% if not is_ajax %}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -67,9 +68,10 @@
                 </div>
             </div>
         </aside>
-
+        {% endif %}
         <!-- Main Content -->
-        <main class="main-content">
+        <main class="main-content" id="main-content-area">
+            {% if not is_ajax %}
             <header class="content-header">
                 <div class="content-title">
                     <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
@@ -85,8 +87,8 @@
                 </button>
                 {% endif %}
             </header>
-
-            <div class="content-body">
+            {% endif %}
+            <div class="content-body" id="spa-content">
                 <div class="alert alert-warning mb-6">
                     <i class="fas fa-exclamation-triangle"></i>
                     <span>Files in trash will be permanently deleted after 30 days</span>
@@ -95,7 +97,7 @@
                 {% if files %}
                 <div class="file-grid">
                     {% for file in files %}
-                    <div class="file-card" id="file-{{ file.id }}">
+                    <div class="file-card animate-scale-up" id="file-{{ file.id }}">
                         <div class="file-preview">
                             <i class="file-icon fas fa-file"></i>
                         </div>
@@ -129,6 +131,7 @@
                 </div>
                 {% endif %}
             </div>
+            {% if not is_ajax %}
         </main>
     </div>
 
@@ -161,7 +164,7 @@
                 if (response.ok) {
                     const card = document.getElementById(`file-${fileId}`);
                     if (card) card.remove();
-                    if (!document.querySelector('.file-card')) location.reload();
+                    if (!document.querySelector('.file-card')) navigateSPA('/trash', false);
                     if (typeof Modal !== 'undefined' && Modal.alert) {
                         await Modal.alert('Success', 'File restored successfully');
                     } else {
@@ -195,7 +198,7 @@
                 if (response.ok) {
                     const card = document.getElementById(`file-${fileId}`);
                     if (card) card.remove();
-                    if (!document.querySelector('.file-card')) location.reload();
+                    if (!document.querySelector('.file-card')) navigateSPA('/trash', false);
                 } else {
                     const data = await response.json();
                     alert('Error: ' + (data.error || 'Failed to delete file'));
@@ -215,7 +218,7 @@
                     method: 'POST',
                     headers: { 'X-CSRFToken': csrfToken }
                 });
-                if (response.ok) location.reload();
+                if (response.ok) navigateSPA('/trash', false);
                 else await Modal.alert('Error', 'Failed to empty trash');
             } catch (e) {
                 await Modal.alert('Error', 'An error occurred');

@@ -11,6 +11,7 @@ class Database:
             check_same_thread=False,
             timeout=30
         )
+        self.conn.row_factory = sqlite3.Row
         self.create_tables()
 
 
@@ -101,8 +102,8 @@ class Database:
         cursor.execute("SELECT * FROM chunks WHERE file_id = ? ORDER BY chunk_index ASC", (file_id,))
         return cursor.fetchall()
 
-    def list_files(self, parent_id=None):
-        """Lists files in a specific folder (or root)."""
+    def list_files(self, user_id=None, parent_id=None):
+        """Lists files in a specific folder (or root). user_id is ignored in local mode."""
         cursor = self.conn.cursor()
         if parent_id is None:
             cursor.execute("SELECT id, filename, total_size, upload_date, is_folder, share_token FROM files WHERE parent_id IS NULL ORDER BY is_folder DESC, upload_date DESC")

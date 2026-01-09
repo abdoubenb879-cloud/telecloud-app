@@ -537,6 +537,7 @@ a:hover {
     background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), transparent);
     opacity: 0;
     transition: opacity var(--transition-base);
+    pointer-events: none;
 }
 
 .file-card:hover {
@@ -594,6 +595,7 @@ a:hover {
     gap: var(--space-1);
     opacity: 0;
     transition: opacity var(--transition-fast);
+    z-index: 5;
 }
 
 .file-card:hover .file-actions {

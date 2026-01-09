@@ -103,13 +103,13 @@
                         <div class="file-meta">
                             Deleted {{ file.deleted_at[:10] if file.deleted_at else 'recently' }}
                         </div>
-                        <div class="flex gap-2 mt-4">
+                        <div class="flex gap-2 mt-4" style="position: relative; z-index: 10;">
                             <button class="btn btn-secondary btn-sm" style="flex: 1;"
-                                onclick="restoreFile({{ file.id }})">
+                                onclick="console.log('Restore clicked', '{{ file.id }}'); restoreFile('{{ file.id }}')">
                                 <i class="fas fa-undo"></i> Restore
                             </button>
                             <button class="btn btn-icon btn-sm btn-ghost" style="color: var(--danger);"
-                                onclick="permanentDelete({{ file.id }})">
+                                onclick="console.log('Delete clicked', '{{ file.id }}'); permanentDelete('{{ file.id }}')">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>

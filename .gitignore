@@ -32,5 +32,6 @@ cloud_metadata_v2.db
 Thumbs.db
 
 # Test files (local only)
-*.txt
+test_*.txt
+!requirements.txt
 verify_full_flow.py

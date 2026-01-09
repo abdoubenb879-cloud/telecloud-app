@@ -103,14 +103,22 @@
             <p class="text-secondary mb-6">Someone shared a file with you</p>
 
             <div class="file-preview-large">
+                {% if is_folder %}
+                <i class="fas fa-folder" style="color: #fbbf24;"></i>
+                {% else %}
                 <i class="fas fa-file-download"></i>
+                {% endif %}
             </div>
 
             <div class="file-info">
                 <h2>{{ filename }}</h2>
                 <p class="file-size">
+                    {% if is_folder %}
+                    <span class="badge badge-primary">FOLDER</span>
+                    {% else %}
                     <span class="badge badge-primary">FILE</span>
                     {{ (file_size / (1024*1024))|round(2) }} MB
+                    {% endif %}
                 </p>
             </div>
 
@@ -123,7 +131,7 @@
 
             <a href="{{ url_for('download_shared', token=token) }}" class="btn btn-primary btn-lg w-full"
                 style="text-decoration: none;">
-                <i class="fas fa-download"></i> Download File
+                <i class="fas fa-download"></i> Download {{ 'Folder' if is_folder else 'File' }}
             </a>
 
             <p class="text-muted mt-6" style="font-size: 0.8rem;">

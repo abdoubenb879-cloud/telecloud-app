@@ -1040,39 +1040,67 @@
                     const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
 
                     for (let i = 0; i < totalChunks; i++) {
-                        const start = i * chunkSize; const end = Math.min(start + chunkSize,
-                            file.size); const chunk = file.slice(start, end); const formData = new FormData(); formData.append('chunk',
-                                chunk); formData.append('upload_id', uploadId); formData.append('chunk_index', i);
-                        formData.append('total_chunks', totalChunks); formData.append('filename', file.name); try {
-                            const
-                            response = await fetch('/upload_chunk', {
-                                method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body:
-                                    formData
-                            }); if (!response.ok) throw new Error('Chunk upload failed'); const percent = Math.round(((i + 1) /
-                                totalChunks) * 100); progressFill.style.width = percent + '%'; uploadPercent.textContent = percent + '%';
-                        }
-                        catch (e) {
-                            await Modal.alert('Upload Failed', `Failed to upload ${file.name}. Please try again.`);
-                            progressContainer.classList.add('hidden'); return;
-                        }
-                    } // Finalize upload const finishData=new FormData();
-                    finishData.append('upload_id', uploadId); finishData.append('filename', file.name); if (folderId)
-                        finishData.append('parent_id', folderId); try {
-                            const res = await fetch('/upload_finish', {
+                        const start = i * chunkSize;
+                        const end = Math.min(start + chunkSize, file.size);
+                        const chunk = file.slice(start, end);
+
+                        const formData = new FormData();
+                        formData.append('chunk', chunk);
+                        formData.append('upload_id', uploadId);
+                        formData.append('chunk_index', i);
+                        formData.append('total_chunks', totalChunks);
+                        formData.append('filename', file.name);
+
+                        try {
+                            const response = await fetch('/upload_chunk', {
                                 method: 'POST',
-                                headers: { 'X-CSRFToken': csrfToken }, body: finishData
-                            }); if (!res.ok) throw new Error('Finalize
-            failed'); } catch (e) { await Modal.alert('Error', 'Failed to finalize upload' );
-            progressContainer.classList.add('hidden'); return; // Exit if finalization fails for any file }
-                            uploadedCount++;
-                        } // Success! Show countdown then refresh progressContainer.classList.add('hidden');
-            Modal.countdown('Upload Complete!', 'Your files have been safely stored.', 3, () => {
-                            location.reload();
+                                headers: { 'X-CSRFToken': csrfToken },
+                                body: formData
+                            });
+
+                            if (!response.ok) throw new Error('Chunk upload failed');
+
+                            const percent = Math.round(((i + 1) / totalChunks) * 100);
+                            progressFill.style.width = percent + '%';
+                            uploadPercent.textContent = percent + '%';
+                        } catch (e) {
+                            await Modal.alert('Upload Failed', `Failed to upload ${file.name}. Please try again.`);
+                            progressContainer.classList.add('hidden');
+                            return;
+                        }
+                    }
+
+                    // Finalize upload
+                    const finishData = new FormData();
+                    finishData.append('upload_id', uploadId);
+                    finishData.append('filename', file.name);
+                    if (folderId) finishData.append('parent_id', folderId);
+
+                    try {
+                        const res = await fetch('/upload_finish', {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': csrfToken },
+                            body: finishData
                         });
+                        if (!res.ok) throw new Error('Finalize failed');
+                    } catch (e) {
+                        await Modal.alert('Error', 'Failed to finalize upload');
+                        progressContainer.classList.add('hidden');
+                        return;
+                    }
+
+                    uploadedCount++;
                 }
 
-                // Hide loading on page load
-                hideLoading();
+                // Success! Show countdown then refresh
+                progressContainer.classList.add('hidden');
+                Modal.countdown('Upload Complete!', 'Your files have been safely stored.', 3, () => {
+                    location.reload();
+                });
+            }
+
+            // Hide loading on page load
+            hideLoading();
     </script>
 </body>
 

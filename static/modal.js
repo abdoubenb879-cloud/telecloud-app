@@ -295,5 +295,106 @@ const Modal = {
             input.focus();
             input.select();
         });
+    },
+
+    /**
+     * Shows a modal to select a target folder
+     * @param {Array} folders - List of {id, filename} objects
+     * @returns {Promise<number|string|null>} - Resolves with folder ID, 'root', or null
+     */
+    folderSelect: function (folders) {
+        return new Promise((resolve) => {
+            const modalId = 'modal-' + Date.now();
+            const modalHtml = `
+            <div class="modal-overlay active" id="${modalId}" style="z-index: 9999;">
+                <div class="modal-content animate-scale-up" style="max-width: 450px;">
+                    <div class="modal-header">
+                        <h3 class="modal-title">Move items to...</h3>
+                        <button class="modal-close" id="close-${modalId}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body mb-6" style="max-height: 400px; overflow-y: auto;">
+                        <div class="folder-list">
+                            <label class="folder-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
+                                <input type="radio" name="target-folder" value="root" checked style="accent-color: var(--primary);">
+                                <i class="fas fa-home" style="color: var(--primary); font-size: 1.1rem;"></i>
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 500;">Root / Home</div>
+                                    <div class="text-xs text-muted">Primary directory</div>
+                                </div>
+                            </label>
+
+                            ${folders.map(f => `
+                                <label class="folder-item" style="display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; cursor: pointer; transition: background 0.2s;">
+                                    <input type="radio" name="target-folder" value="${f.id}" style="accent-color: var(--primary);">
+                                    <i class="fas fa-folder" style="color: #fbbf24; font-size: 1.1rem;"></i>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 500;">${f.filename}</div>
+                                    </div>
+                                </label>
+                            `).join('')}
+
+                            ${folders.length === 0 ? '<p class="text-center text-muted py-4">No folders available. You can create one first.</p>' : ''}
+                        </div>
+                    </div>
+                    <div class="modal-footer flex gap-3 justify-between items-center pt-4 border-t border-dashed border-border">
+                        <button class="btn btn-ghost btn-sm" id="new-folder-${modalId}">
+                            <i class="fas fa-folder-plus"></i> New Folder
+                        </button>
+                        <div class="flex gap-2">
+                            <button class="btn btn-secondary" id="cancel-${modalId}">Cancel</button>
+                            <button class="btn btn-primary" id="confirm-${modalId}">Move Here</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+            // Add styles for hover effect
+            const style = document.createElement('style');
+            style.innerHTML = `
+                .folder-item:hover { background: rgba(255,255,255,0.05); }
+                .folder-item input:checked + i + div { color: var(--primary); }
+            `;
+            document.head.appendChild(style);
+
+            const modal = document.getElementById(modalId);
+            const confirmBtn = document.getElementById(`confirm-${modalId}`);
+            const cancelBtn = document.getElementById(`cancel-${modalId}`);
+            const closeBtn = document.getElementById(`close-${modalId}`);
+            const newFolderBtn = document.getElementById(`new-folder-${modalId}`);
+
+            const cleanup = () => {
+                modal.classList.remove('active');
+                setTimeout(() => {
+                    modal.remove();
+                    style.remove();
+                }, 200);
+            };
+
+            confirmBtn.onclick = () => {
+                const selected = modal.querySelector('input[name="target-folder"]:checked');
+                const value = selected ? selected.value : null;
+                cleanup();
+                resolve(value);
+            };
+
+            newFolderBtn.onclick = () => {
+                cleanup();
+                resolve('create_new');
+            };
+
+            const cancel = () => {
+                cleanup();
+                resolve(null);
+            };
+
+            cancelBtn.onclick = cancel;
+            closeBtn.onclick = cancel;
+            modal.onclick = (e) => { if (e.target === modal) cancel(); };
+        });
     }
 };

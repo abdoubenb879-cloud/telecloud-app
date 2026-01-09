@@ -132,6 +132,10 @@
                         <i class="fas fa-download"></i>
                         <span class="hide-mobile">Download</span>
                     </button>
+                    <button class="btn btn-secondary btn-sm" onclick="moveSelected()">
+                        <i class="fas fa-file-export"></i>
+                        <span class="hide-mobile">Move</span>
+                    </button>
                     <button class="btn btn-danger btn-sm" onclick="deleteSelected()">
                         <i class="fas fa-trash"></i>
                         <span class="hide-mobile">Delete</span>
@@ -407,6 +411,75 @@
             document.body.classList.remove('select-mode');
             document.getElementById('selectModeBtn').classList.remove('active');
             updateSelectionCount();
+        }
+
+        async function moveSelected() {
+            if (selectedFiles.size === 0) return;
+
+            showLoading('Fetching folders...');
+            try {
+                const res = await fetch('/api/folders');
+                const data = await res.json();
+                hideLoading();
+
+                if (data.folders) {
+                    // Filter out folders that are currently selected to avoid moving a folder into itself
+                    // In a real app we'd also filter out subfolders of selected folders
+                    const availableFolders = data.folders.filter(f => !selectedFiles.has(f.id));
+
+                    let targetFolderId = await Modal.folderSelect(availableFolders);
+
+                    if (!targetFolderId) return;
+
+                    if (targetFolderId === 'create_new') {
+                        const newName = await Modal.prompt('New Folder', 'Enter folder name:');
+                        if (!newName) return;
+
+                        showLoading('Creating folder...');
+                        const createRes = await fetch('/create_folder_ajax', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': csrfToken
+                            },
+                            body: JSON.stringify({ name: newName, parent_id: currentFolderId })
+                        });
+                        const createData = await createRes.json();
+                        if (createData.folder_id) {
+                            targetFolderId = createData.folder_id;
+                        } else {
+                            throw new Error(createData.error || 'Failed to create folder');
+                        }
+                    }
+
+                    showLoading(`Moving ${selectedFiles.size} items...`);
+                    const moveRes = await fetch('/api/move/bulk', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({
+                            file_ids: Array.from(selectedFiles),
+                            target_folder_id: targetFolderId
+                        })
+                    });
+
+                    const moveData = await moveRes.json();
+                    hideLoading();
+
+                    if (moveData.message) {
+                        cancelSelection();
+                        refreshFileGrid();
+                        await Modal.alert('Success', moveData.message);
+                    } else {
+                        throw new Error(moveData.error || 'Move failed');
+                    }
+                }
+            } catch (e) {
+                hideLoading();
+                await Modal.alert('Error', e.message || 'An error occurred during move');
+            }
         }
 
         // Update selection count display

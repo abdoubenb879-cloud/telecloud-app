@@ -197,6 +197,25 @@ class CloudDatabase:
         return result if result else []
 
 
+    def get_all_folders(self, user_id):
+        """Get all folders for a user (for population of Move modal)."""
+        result = self._request("files", params={
+            "user_id": f"eq.{user_id}",
+            "is_folder": "eq.true",
+            "is_deleted": "neq.true",
+            "select": "id,filename"
+        })
+        return result if result else []
+    
+    def move_file(self, file_id, user_id, new_parent_id):
+        """Update a file's parent folder."""
+        # Ensure new_parent_id is handled (None for root)
+        data = {"parent_id": new_parent_id}
+        self._request("files", method="PATCH", data=data, params={
+            "id": f"eq.{file_id}",
+            "user_id": f"eq.{user_id}"
+        })
+
     def delete_file(self, file_id, user_id):
         """Deletes a file and its chunks (Supabase handles cascade if configured)."""
         # First delete chunks
@@ -306,6 +325,25 @@ class CloudDatabase:
             "order": "deleted_at.desc"
         })
         return result if result else []
+    
+    def get_all_folders(self, user_id):
+        """Get all folders for a user (for population of Move modal)."""
+        result = self._request("files", params={
+            "user_id": f"eq.{user_id}",
+            "is_folder": "eq.true",
+            "is_deleted": "neq.true",
+            "select": "id,filename"
+        })
+        return result if result else []
+    
+    def move_file(self, file_id, user_id, new_parent_id):
+        """Update a file's parent folder."""
+        # Ensure new_parent_id is handled (None for root)
+        data = {"parent_id": new_parent_id}
+        self._request("files", method="PATCH", data=data, params={
+            "id": f"eq.{file_id}",
+            "user_id": f"eq.{user_id}"
+        })
     
     def empty_trash(self, user_id):
         """Permanently delete all trashed files for a user."""

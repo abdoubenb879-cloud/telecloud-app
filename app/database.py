@@ -123,6 +123,20 @@ class Database:
             current_id = folder[2]
         return breadcrumbs
 
+        self.conn.commit()
+
+    def get_all_folders(self):
+        """Get all folders (local mode)."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id, filename FROM files WHERE is_folder = 1")
+        return cursor.fetchall()
+        
+    def move_file(self, file_id, new_parent_id):
+        """Update a file's parent folder (local mode)."""
+        cursor = self.conn.cursor()
+        cursor.execute("UPDATE files SET parent_id = ? WHERE id = ?", (new_parent_id, file_id))
+        self.conn.commit()
+
     def delete_file(self, file_id):
         """Deletes a file (or folder) and its content."""
         # Note: Basic deletion. If folder, won't recursively delete children in this snippet (for safety).

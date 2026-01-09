@@ -776,6 +776,58 @@ def api_list_files():
     files = db.list_files(user_id, parent_id=folder_id)
     return jsonify({"files": files})
 
+@app.route('/api/folders')
+@rate_limit
+def api_get_folders():
+    """API endpoint to get list of all folders for the Move modal."""
+    if 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    user_id = session['user_id']
+    if Config.MULTI_USER:
+        folders = db.get_all_folders(user_id)
+    else:
+        folders = db.get_all_folders()
+        # Convert tuple list to dict list for local mode consistency
+        folders = [{"id": f[0], "filename": f[1]} for f in folders]
+        
+    return jsonify({"folders": folders})
+
+@app.route('/api/move/bulk', methods=['POST'])
+@csrf.exempt
+@rate_limit
+def api_bulk_move():
+    """Move multiple files and folders to a target directory."""
+    if 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+        
+    try:
+        data = request.get_json()
+        file_ids = data.get('file_ids', [])
+        target_id = data.get('target_folder_id') # Can be None for root
+        
+        if target_id == 'root':
+            target_id = None
+        elif target_id:
+            target_id = int(target_id)
+            
+        user_id = session['user_id']
+        
+        for file_id in file_ids:
+            # Basic validation: don't move a folder into itself
+            if int(file_id) == target_id:
+                continue
+                
+            if Config.MULTI_USER:
+                db.move_file(int(file_id), user_id, target_id)
+            else:
+                db.move_file(int(file_id), target_id)
+                
+        return jsonify({"message": f"Successfully moved {len(file_ids)} items"})
+    except Exception as e:
+        print(f"[MOVE] Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 def get_session_data():
     """Get session data, falling back to Config for single-user mode."""

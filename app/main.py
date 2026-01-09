@@ -723,6 +723,250 @@ def download_folder(folder_id):
         traceback.print_exc()
         return jsonify({"error": "Failed to create folder download"}), 500
 
+# In-memory share tokens (in production, use database)
+share_tokens = {}
+
+@app.route('/generate_share', methods=['POST'])
+@csrf.exempt
+@rate_limit
+def generate_share():
+    """Generate a shareable link for a file or folder."""
+    if 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    user_id = session['user_id']
+    data = request.get_json()
+    file_id = data.get('file_id')
+    is_folder = data.get('is_folder', False)
+    
+    if not file_id:
+        return jsonify({"error": "File ID required"}), 400
+    
+    # Verify ownership
+    file_info = db.get_file(file_id)
+    if not file_info or str(file_info.get('user_id')) != str(user_id):
+        return jsonify({"error": "File not found"}), 404
+    
+    # Generate token
+    token = uuid.uuid4().hex[:16]
+    share_tokens[token] = {
+        'file_id': file_id,
+        'user_id': user_id,
+        'is_folder': is_folder,
+        'filename': file_info.get('filename', 'Shared')
+    }
+    
+    # Generate full URL
+    share_url = request.host_url.rstrip('/') + f'/shared/{token}'
+    
+    return jsonify({"share_url": share_url, "token": token})
+
+@app.route('/shared/<token>')
+def shared_view(token):
+    """View/download a shared file or folder."""
+    if token not in share_tokens:
+        return render_template('error.html', error="Share link expired or invalid"), 404
+    
+    share_info = share_tokens[token]
+    file_id = share_info['file_id']
+    is_folder = share_info['is_folder']
+    filename = share_info['filename']
+    
+    if is_folder:
+        # Return a simple page with folder download button
+        return f'''
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Shared Folder - {filename}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{
+                    font-family: 'Inter', sans-serif;
+                    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    padding: 20px;
+                }}
+                .card {{
+                    background: rgba(30, 27, 75, 0.8);
+                    border: 1px solid rgba(139, 92, 246, 0.3);
+                    border-radius: 24px;
+                    padding: 48px;
+                    text-align: center;
+                    max-width: 400px;
+                    backdrop-filter: blur(20px);
+                }}
+                .icon {{
+                    width: 80px;
+                    height: 80px;
+                    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+                    border-radius: 20px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 0 auto 24px;
+                    font-size: 2rem;
+                }}
+                h1 {{ font-size: 1.5rem; margin-bottom: 8px; }}
+                p {{ color: #94a3b8; margin-bottom: 32px; }}
+                .btn {{
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+                    color: white;
+                    padding: 14px 28px;
+                    border-radius: 12px;
+                    text-decoration: none;
+                    font-weight: 600;
+                    transition: transform 0.2s, box-shadow 0.2s;
+                }}
+                .btn:hover {{
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 30px rgba(139, 92, 246, 0.4);
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <div class="icon"><i class="fas fa-folder"></i></div>
+                <h1>{filename}</h1>
+                <p>Shared folder ready for download</p>
+                <a href="/shared/{token}/download" class="btn">
+                    <i class="fas fa-download"></i> Download Folder
+                </a>
+            </div>
+        </body>
+        </html>
+        '''
+    else:
+        # For files, redirect to download
+        return redirect(f'/shared/{token}/download')
+
+@app.route('/shared/<token>/download')
+def shared_download(token):
+    """Download a shared file or folder."""
+    if token not in share_tokens:
+        return jsonify({"error": "Share link expired"}), 404
+    
+    share_info = share_tokens[token]
+    file_id = share_info['file_id']
+    is_folder = share_info['is_folder']
+    user_id = share_info['user_id']
+    
+    if is_folder:
+        # Use same logic as folder download but without auth check
+        import zipfile
+        
+        try:
+            folder = db.get_file(file_id)
+            folder_name = folder.get('filename', 'Folder')
+            
+            def get_files_recursive(parent_id, path=""):
+                files_list = []
+                items = db.list_files(user_id, parent_id)
+                
+                for item in items:
+                    item_id = item['id'] if isinstance(item, dict) else item[0]
+                    item_name = item['filename'] if isinstance(item, dict) else item[1]
+                    item_is_folder = item.get('is_folder', False) if isinstance(item, dict) else item[5]
+                    
+                    if item_is_folder:
+                        subpath = f"{path}/{item_name}" if path else item_name
+                        files_list.extend(get_files_recursive(item_id, subpath))
+                    else:
+                        files_list.append({
+                            'id': item_id,
+                            'name': item_name,
+                            'path': f"{path}/{item_name}" if path else item_name
+                        })
+                
+                return files_list
+            
+            files = get_files_recursive(file_id)
+            
+            if not files:
+                return jsonify({"error": "Folder is empty"}), 400
+            
+            zip_buffer = BytesIO()
+            bot = get_bot_client()
+            bot.connect()
+            
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for file_info in files:
+                    try:
+                        chunks = db.get_chunks(file_info['id'])
+                        if not chunks:
+                            continue
+                        
+                        file_data = BytesIO()
+                        for chunk in chunks:
+                            msg_id = chunk['message_id'] if isinstance(chunk, dict) else chunk[3]
+                            chunk_path = bot.download_media(msg_id)
+                            if chunk_path and os.path.exists(chunk_path):
+                                with open(chunk_path, 'rb') as f:
+                                    file_data.write(f.read())
+                                os.remove(chunk_path)
+                        
+                        file_data.seek(0)
+                        zip_file.writestr(file_info['path'], file_data.read())
+                    except Exception as e:
+                        print(f"[SHARED DL] Error: {e}")
+                        continue
+            
+            zip_buffer.seek(0)
+            
+            return send_file(
+                zip_buffer,
+                mimetype='application/zip',
+                as_attachment=True,
+                download_name=f'{folder_name}.zip'
+            )
+            
+        except Exception as e:
+            print(f"[SHARED FOLDER] Error: {e}")
+            return jsonify({"error": "Download failed"}), 500
+    else:
+        # Single file download
+        try:
+            file_info = db.get_file(file_id)
+            chunks = db.get_chunks(file_id)
+            
+            if not chunks:
+                return jsonify({"error": "File not found"}), 404
+            
+            bot = get_bot_client()
+            bot.connect()
+            
+            file_data = BytesIO()
+            for chunk in chunks:
+                msg_id = chunk['message_id'] if isinstance(chunk, dict) else chunk[3]
+                chunk_path = bot.download_media(msg_id)
+                if chunk_path and os.path.exists(chunk_path):
+                    with open(chunk_path, 'rb') as f:
+                        file_data.write(f.read())
+                    os.remove(chunk_path)
+            
+            file_data.seek(0)
+            
+            return send_file(
+                file_data,
+                as_attachment=True,
+                download_name=file_info.get('filename', 'download')
+            )
+            
+        except Exception as e:
+            print(f"[SHARED FILE] Error: {e}")
+            return jsonify({"error": "Download failed"}), 500
+
 @app.route('/settings')
 @rate_limit
 def settings_page():

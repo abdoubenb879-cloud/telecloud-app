@@ -272,6 +272,9 @@
             <div class="dropdown-item" id="fileShareBtn" onclick="shareFile(currentFileId)">
                 <i class="fas fa-share-alt"></i> Share
             </div>
+            <div class="dropdown-item" id="folderShareBtn" style="display: none;" onclick="shareFolder(currentFileId)">
+                <i class="fas fa-share-alt"></i> Share Folder
+            </div>
             <div class="dropdown-item" onclick="renameFile(currentFileId, currentFileName)">
                 <i class="fas fa-edit"></i> Rename
             </div>
@@ -530,11 +533,13 @@
 
             // Show/hide folder-specific options
             const folderDownloadBtn = document.getElementById('folderDownloadBtn');
+            const folderShareBtn = document.getElementById('folderShareBtn');
             const fileDownloadBtn = document.getElementById('fileDownloadBtn');
             const filePreviewBtn = document.getElementById('filePreviewBtn');
             const fileShareBtn = document.getElementById('fileShareBtn');
 
             if (folderDownloadBtn) folderDownloadBtn.style.display = isFolder ? 'flex' : 'none';
+            if (folderShareBtn) folderShareBtn.style.display = isFolder ? 'flex' : 'none';
             if (fileDownloadBtn) fileDownloadBtn.style.display = isFolder ? 'none' : 'flex';
             if (filePreviewBtn) filePreviewBtn.style.display = isFolder ? 'none' : 'flex';
             if (fileShareBtn) fileShareBtn.style.display = isFolder ? 'none' : 'flex';
@@ -742,6 +747,36 @@
             } catch (e) {
                 hideLoading();
                 await Modal.alert('Error', 'Failed to generate share link');
+            }
+        }
+
+        // Share folder
+        async function shareFolder(folderId) {
+            closeFileMenu();
+            showLoading('Generating folder share link...');
+
+            try {
+                const response = await fetch('/generate_share', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ file_id: folderId, is_folder: true })
+                });
+
+                const data = await response.json();
+                hideLoading();
+
+                if (data.share_url) {
+                    await navigator.clipboard.writeText(data.share_url);
+                    await Modal.alert('Success', 'Folder share link copied to clipboard!');
+                } else {
+                    throw new Error('No URL returned');
+                }
+            } catch (e) {
+                hideLoading();
+                await Modal.alert('Error', 'Failed to generate folder share link');
             }
         }
 

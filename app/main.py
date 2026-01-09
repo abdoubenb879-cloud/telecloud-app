@@ -480,57 +480,6 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-@app.route('/trash')
-def trash_page():
-    """Show deleted files."""
-    if Config.MULTI_USER:
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
-        user_id = session['user_id']
-        files = db.get_trashed_files(user_id)
-    else:
-        files = []  # Local mode doesn't support trash
-
-    return render_template('trash.html',
-                           files=files,
-                           username=session.get('username', 'User'))
-
-@app.route('/restore/<int:file_id>', methods=['POST'])
-@csrf.exempt
-def restore_file(file_id):
-    """Restore a file from trash."""
-    if Config.MULTI_USER:
-        if 'user_id' not in session:
-            return jsonify({"error": "Unauthorized"}), 401
-        user_id = session['user_id']
-        db.restore_file(file_id, user_id)
-        return jsonify({"status": "ok"})
-    return jsonify({"error": "Not supported"}), 501
-
-@app.route('/delete/permanent/<int:file_id>', methods=['POST'])
-@csrf.exempt
-def permanent_delete_file(file_id):
-    """Permanently delete a file from trash."""
-    if Config.MULTI_USER:
-        if 'user_id' not in session:
-            return jsonify({"error": "Unauthorized"}), 401
-        user_id = session['user_id']
-        db.permanent_delete(file_id, user_id)
-        return jsonify({"status": "ok"})
-    return jsonify({"error": "Not supported"}), 501
-
-@app.route('/trash/empty', methods=['POST'])
-@csrf.exempt
-def empty_trash():
-    """Empty the trash (permanently delete all trashed files)."""
-    if Config.MULTI_USER:
-        if 'user_id' not in session:
-            return jsonify({"error": "Unauthorized"}), 401
-        user_id = session['user_id']
-        db.empty_trash(user_id)
-        return jsonify({"status": "ok"})
-    return jsonify({"error": "Not supported"}), 501
-
 @app.route('/rename', methods=['POST'])
 @csrf.exempt
 @rate_limit
@@ -1228,6 +1177,9 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
 @csrf.exempt
 def delete_file_route(file_id):
     """Soft deletes a file (moves to trash)."""
+    if Config.MULTI_USER and 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+        
     try:
         user_id = session.get('user_id', 'local')
         
@@ -1262,17 +1214,24 @@ def trash():
 @csrf.exempt
 def restore_file_route(file_id):
     """Restore a file from trash."""
+    if Config.MULTI_USER and 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
     try:
         user_id = session.get('user_id', 'local')
         db.restore_file(file_id, user_id)
         return jsonify({"message": "File restored successfully"})
     except Exception as e:
+        print(f"[RESTORE] Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/trash/empty', methods=['POST'])
 @csrf.exempt
 def empty_trash_route():
     """Permanently delete all files in trash."""
+    if Config.MULTI_USER and 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+        
     try:
         user_id = session.get('user_id', 'local')
         
@@ -1282,7 +1241,8 @@ def empty_trash_route():
         bot.connect()
         
         for file in trashed_files:
-            chunks = db.get_chunks(file['id'])
+            file_id = file['id'] if isinstance(file, dict) else file[0]
+            chunks = db.get_chunks(file_id)
             for chunk in chunks:
                 msg_id = chunk['message_id'] if Config.MULTI_USER else chunk[3]
                 try:
@@ -1295,12 +1255,16 @@ def empty_trash_route():
         
         return jsonify({"message": "Trash emptied successfully"})
     except Exception as e:
+        print(f"[EMPTY TRASH] Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/delete/permanent/<int:file_id>', methods=['POST'])
 @csrf.exempt
 def permanent_delete_route(file_id):
     """Permanently delete a single file from trash."""
+    if Config.MULTI_USER and 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+        
     try:
         user_id = session.get('user_id', 'local')
         
@@ -1321,6 +1285,7 @@ def permanent_delete_route(file_id):
         
         return jsonify({"message": "File permanently deleted"})
     except Exception as e:
+        print(f"[PERM DELETE] Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 

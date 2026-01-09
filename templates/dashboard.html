@@ -691,6 +691,52 @@
             const files = Array.from(event.target.files);
             if (!files.length) return;
 
+            // Get folder info for confirmation
+            const rootFolderName = files[0].webkitRelativePath.split('/')[0];
+            const totalFiles = files.length;
+            const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+            const sizeFormatted = totalSize > 1024 * 1024 * 1024
+                ? (totalSize / 1024 / 1024 / 1024).toFixed(2) + ' GB'
+                : (totalSize / 1024 / 1024).toFixed(1) + ' MB';
+
+            // Count unique subfolders
+            const folders = new Set();
+            files.forEach(f => {
+                const parts = f.webkitRelativePath.split('/');
+                parts.pop(); // Remove filename
+                if (parts.length > 0) folders.add(parts.join('/'));
+            });
+
+            // Show nice confirmation modal
+            const confirmed = await Modal.confirm(
+                `📁 Upload "${rootFolderName}"?`,
+                `<div style="text-align: left; margin-top: 12px;">
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                        <span style="color: var(--text-muted);">Files</span>
+                        <span style="font-weight: 600;">${totalFiles.toLocaleString()}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                        <span style="color: var(--text-muted);">Folders</span>
+                        <span style="font-weight: 600;">${folders.size.toLocaleString()}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                        <span style="color: var(--text-muted);">Total Size</span>
+                        <span style="font-weight: 600;">${sizeFormatted}</span>
+                    </div>
+                </div>
+                <p style="margin-top: 16px; font-size: 0.85rem; color: var(--text-muted);">
+                    ⚠️ This may take a while. Keep this tab open.
+                </p>`,
+                'Start Upload',
+                'Cancel',
+                false
+            );
+
+            if (!confirmed) {
+                event.target.value = ''; // Reset input
+                return;
+            }
+
             const progressContainer = document.getElementById('uploadProgress');
             const progressFill = document.getElementById('progressFill');
             const uploadPercent = document.getElementById('uploadPercent');
@@ -698,9 +744,6 @@
             const uploadFileName = document.getElementById('uploadFileName');
 
             progressContainer.classList.remove('hidden');
-
-            // Get the root folder name from the first file's path
-            const rootFolderName = files[0].webkitRelativePath.split('/')[0];
             uploadStatus.textContent = `Uploading folder: ${rootFolderName}`;
 
             // Build folder structure from file paths

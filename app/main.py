@@ -1448,24 +1448,33 @@ def shared_file_page(token):
 def download_shared(token):
     """Download a file via share token."""
     try:
+        print(f"[SHARE] Download request for token: {token}")
         file_info = db.get_file_by_token(token)
         if not file_info:
+            print(f"[SHARE] Token not found: {token}")
             return "Invalid or expired share link", 404
+        
+        print(f"[SHARE] File info: id={file_info['id']}, name={file_info['filename']}, is_folder={file_info['is_folder']}")
         
         file_id = file_info['id']
         filename = file_info['filename']
         is_folder = file_info['is_folder']
         # user_id is only in cloud DB, local uses 'local'
         user_id = file_info['user_id'] if 'user_id' in file_info.keys() else 'local'
+        print(f"[SHARE] User ID: {user_id}")
         
         if is_folder:
             # Handle Folder Download (ZIP)
             import zipfile
             from io import BytesIO
             
+            print(f"[SHARE] Starting folder download for folder ID: {file_id}")
+            
             def get_files_recursive(parent_id, path=""):
                 files_list = []
+                print(f"[SHARE] Listing files in folder {parent_id}, user={user_id}")
                 items = db.list_files(user_id, parent_id)
+                print(f"[SHARE] Found {len(items) if items else 0} items in folder {parent_id}")
                 for item in items:
                     i_id = item['id']
                     i_name = item['filename']
@@ -1483,7 +1492,10 @@ def download_shared(token):
                 return files_list
 
             files = get_files_recursive(file_id)
-            if not files: return "Folder is empty", 400
+            print(f"[SHARE] Total files to zip: {len(files)}")
+            if not files: 
+                print(f"[SHARE] Folder is empty, returning 400")
+                return "Folder is empty", 400
             
             zip_buffer = BytesIO()
             bot = get_bot_client()

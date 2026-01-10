@@ -1186,6 +1186,21 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
         print(f"[BG] Initializing BotClient...")
         bot = get_bot_client()
         
+        # Generate Thumbnail for images
+        thumbnail_filename = None
+        if mime_type.startswith('image/'):
+            try:
+                thumb_id = str(uuid.uuid4())[:8]
+                thumbnail_filename = f"thumb_{thumb_id}.jpg"
+                thumb_path = os.path.join(Config.UPLOAD_DIR, thumbnail_filename)
+                with Image.open(filepath) as img:
+                    img.thumbnail((200, 200))
+                    if img.mode != 'RGB': img = img.convert('RGB')
+                    img.save(thumb_path, "JPEG", quality=85)
+                print(f"[BG] Generated thumbnail: {thumbnail_filename}")
+            except Exception as te:
+                print(f"[BG] Thumbnail failed: {te}")
+
         # Split file into chunks
         print(f"[BG] Splitting file {filepath} (Size: {file_size})...")
         chunk_paths = Chunker.split_file(filepath, Config.CHUNK_SIZE, Config.UPLOAD_DIR)
@@ -1217,11 +1232,11 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
         print(f"[BG] All chunks uploaded. Saving to DB...")
         
         if Config.MULTI_USER:
-             f_id = db.add_file(user_id, original_filename, file_size, chunk_count, parent_id=parent_id)
+             f_id = db.add_file(user_id, original_filename, file_size, chunk_count, parent_id=parent_id, thumbnail=thumbnail_filename)
              for c in uploaded_chunks:
                  db.add_chunk(f_id, c['index'], c['msg_id'], c['size'])
         else:
-             f_id = db.add_file(original_filename, file_size, chunk_count, parent_id=parent_id)
+             f_id = db.add_file('local', original_filename, file_size, chunk_count, parent_id=parent_id, thumbnail=thumbnail_filename)
              for c in uploaded_chunks:
                  db.add_chunk(f_id, c['index'], c['msg_id'], c['size'])
                  

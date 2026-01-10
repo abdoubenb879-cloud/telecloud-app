@@ -31,7 +31,8 @@ class Database:
                 checksum TEXT,
                 parent_id INTEGER DEFAULT NULL,
                 share_token TEXT UNIQUE DEFAULT NULL,
-                is_folder BOOLEAN DEFAULT 0
+                is_folder BOOLEAN DEFAULT 0,
+                thumbnail TEXT
             )
         ''')
         
@@ -49,12 +50,12 @@ class Database:
         
         self.conn.commit()
 
-    def add_file(self, filename, total_size, chunk_count, checksum=None, parent_id=None):
-        """Adds a new file record and returns its ID."""
+    def add_file(self, user_id, filename, total_size, chunk_count, checksum=None, parent_id=None, thumbnail=None):
+        """Adds a new file record and returns its ID. user_id is ignored in local mode."""
         cursor = self.conn.cursor()
         cursor.execute(
-            "INSERT INTO files (filename, total_size, chunk_count, checksum, parent_id, is_folder) VALUES (?, ?, ?, ?, ?, 0)",
-            (filename, total_size, chunk_count, checksum, parent_id)
+            "INSERT INTO files (filename, total_size, chunk_count, checksum, parent_id, is_folder, thumbnail) VALUES (?, ?, ?, ?, ?, 0, ?)",
+            (filename, total_size, chunk_count, checksum, parent_id, thumbnail)
         )
         self.conn.commit()
         return cursor.lastrowid

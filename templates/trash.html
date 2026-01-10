@@ -69,69 +69,72 @@
             </div>
         </aside>
         {% endif %}
-        <!-- Main Content -->
+        <!-- Main Content Area -->
         <main class="main-content" id="main-content-area">
             {% if not is_ajax %}
-            <header class="content-header">
-                <div class="content-title">
-                    <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
-                        <i class="fas fa-bars"></i>
+            <div id="spa-content-container">
+                <header class="content-header">
+                    <div class="content-title">
+                        <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
+                            <i class="fas fa-bars"></i>
+                        </button>
+                        <h2><i class="fas fa-trash-alt" style="color: var(--danger); margin-right: 12px;"></i> Trash
+                        </h2>
+                    </div>
+
+                    {% if files %}
+                    <button class="btn btn-danger" onclick="emptyTrash()">
+                        <i class="fas fa-trash"></i>
+                        <span class="hide-mobile">Empty Trash</span>
                     </button>
-                    <h2><i class="fas fa-trash-alt" style="color: var(--danger); margin-right: 12px;"></i> Trash</h2>
-                </div>
-
-                {% if files %}
-                <button class="btn btn-danger" onclick="emptyTrash()">
-                    <i class="fas fa-trash"></i>
-                    <span class="hide-mobile">Empty Trash</span>
-                </button>
+                    {% endif %}
+                </header>
                 {% endif %}
-            </header>
-            {% endif %}
-            <div class="content-body" id="spa-content">
-                <div class="alert alert-warning mb-6">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>Files in trash will be permanently deleted after 30 days</span>
-                </div>
+                <div class="content-body" id="spa-content">
+                    <div class="alert alert-warning mb-6">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>Files in trash will be permanently deleted after 30 days</span>
+                    </div>
 
-                {% if files %}
-                <div class="file-grid">
-                    {% for file in files %}
-                    <div class="file-card animate-scale-up" id="file-{{ file.id }}">
-                        <div class="file-preview">
-                            <i class="file-icon fas fa-file"></i>
+                    {% if files %}
+                    <div class="file-grid">
+                        {% for file in files %}
+                        <div class="file-card animate-scale-up" id="file-{{ file.id }}">
+                            <div class="file-preview">
+                                <i class="file-icon fas fa-file"></i>
+                            </div>
+                            <div class="file-name" title="{{ file.filename }}">{{ file.filename }}</div>
+                            <div class="file-meta">
+                                Deleted {{ file.deleted_at[:10] if file.deleted_at else 'recently' }}
+                            </div>
+                            <div class="flex gap-2 mt-4" style="position: relative; z-index: 10;">
+                                <button class="btn btn-secondary btn-sm" style="flex: 1;"
+                                    onclick="console.log('Restore clicked', '{{ file.id }}'); restoreFile('{{ file.id }}')">
+                                    <i class="fas fa-undo"></i> Restore
+                                </button>
+                                <button class="btn btn-icon btn-sm btn-ghost" style="color: var(--danger);"
+                                    onclick="console.log('Delete clicked', '{{ file.id }}'); permanentDelete('{{ file.id }}')">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div class="file-name" title="{{ file.filename }}">{{ file.filename }}</div>
-                        <div class="file-meta">
-                            Deleted {{ file.deleted_at[:10] if file.deleted_at else 'recently' }}
-                        </div>
-                        <div class="flex gap-2 mt-4" style="position: relative; z-index: 10;">
-                            <button class="btn btn-secondary btn-sm" style="flex: 1;"
-                                onclick="console.log('Restore clicked', '{{ file.id }}'); restoreFile('{{ file.id }}')">
-                                <i class="fas fa-undo"></i> Restore
-                            </button>
-                            <button class="btn btn-icon btn-sm btn-ghost" style="color: var(--danger);"
-                                onclick="console.log('Delete clicked', '{{ file.id }}'); permanentDelete('{{ file.id }}')">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="empty-state">
-                    <div class="empty-state-icon">
-                        <i class="fas fa-trash-alt"></i>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <i class="fas fa-trash-alt"></i>
+                        </div>
+                        <h3 class="empty-state-title">Trash is Empty</h3>
+                        <p class="empty-state-text">Files you delete will appear here for 30 days</p>
+                        <a href="/" class="btn btn-primary" style="text-decoration: none;">
+                            <i class="fas fa-arrow-left"></i> Back to Files
+                        </a>
                     </div>
-                    <h3 class="empty-state-title">Trash is Empty</h3>
-                    <p class="empty-state-text">Files you delete will appear here for 30 days</p>
-                    <a href="/" class="btn btn-primary" style="text-decoration: none;">
-                        <i class="fas fa-arrow-left"></i> Back to Files
-                    </a>
-                </div>
-                {% endif %}
-            </div>
-            {% if not is_ajax %}
+                    {% endif %}
+                    {% endif %}
+                </div> <!-- End spa-content-container -->
+                {% if not is_ajax %}
         </main>
     </div>
 

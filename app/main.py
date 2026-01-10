@@ -956,13 +956,21 @@ def upload_finish():
 @app.route('/thumbnail/<int:file_id>')
 def get_thumbnail(file_id):
     """Serve a thumbnail for the given file, or a placeholder if not available."""
-    thumb_path = os.path.join(app.static_folder, 'thumbnails', f"{file_id}.jpg")
+    # First check if file has thumbnail in database
+    file_info = db.get_file(file_id)
+    if file_info and file_info['thumbnail']:
+        thumb_path = os.path.join(Config.UPLOAD_DIR, file_info['thumbnail'])
+        if os.path.exists(thumb_path):
+            return send_file(thumb_path, mimetype='image/jpeg')
     
+    # Legacy: check static thumbnails folder
+    thumb_path = os.path.join(app.static_folder, 'thumbnails', f"{file_id}.jpg")
     if os.path.exists(thumb_path):
         return send_file(thumb_path, mimetype='image/jpeg')
-    else:
-        # Return a 1x1 transparent pixel as fallback (or 404)
-        return '', 404
+    
+    # Return 1x1 transparent PNG (prevents 404 console spam)
+    transparent_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
+    return Response(transparent_png, mimetype='image/png', status=200)
 
 import mimetypes
 from flask import Response, stream_with_context

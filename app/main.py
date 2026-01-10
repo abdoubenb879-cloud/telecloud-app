@@ -958,8 +958,10 @@ def get_thumbnail(file_id):
     """Serve a thumbnail for the given file, or a placeholder if not available."""
     # First check if file has thumbnail in database
     file_info = db.get_file(file_id)
-    if file_info and file_info['thumbnail']:
-        thumb_path = os.path.join(Config.UPLOAD_DIR, file_info['thumbnail'])
+    # Use .get() to safely handle databases without the thumbnail column
+    thumbnail = file_info.get('thumbnail') if file_info else None
+    if thumbnail:
+        thumb_path = os.path.join(Config.UPLOAD_DIR, thumbnail)
         if os.path.exists(thumb_path):
             return send_file(thumb_path, mimetype='image/jpeg')
     

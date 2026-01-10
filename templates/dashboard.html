@@ -84,181 +84,181 @@
                             <i class="fas fa-bars"></i>
                         </button>
 
-                    <nav class="breadcrumbs">
-                        <a href="/" class="breadcrumb-item">My Files</a>
-                        {% for crumb in breadcrumbs %}
-                        <span class="breadcrumb-separator">/</span>
-                        <a href="/?folder_id={{ crumb.id }}"
-                            class="breadcrumb-item {% if loop.last %}active{% endif %}">
-                            {{ crumb.name }}
-                        </a>
-                        {% endfor %}
-                    </nav>
+                        <nav class="breadcrumbs">
+                            <a href="/" class="breadcrumb-item">My Files</a>
+                            {% for crumb in breadcrumbs %}
+                            <span class="breadcrumb-separator">/</span>
+                            <a href="/?folder_id={{ crumb.id }}"
+                                class="breadcrumb-item {% if loop.last %}active{% endif %}">
+                                {{ crumb.name }}
+                            </a>
+                            {% endfor %}
+                        </nav>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button class="btn btn-ghost" id="selectModeBtn" onclick="toggleSelectMode()">
+                            <i class="fas fa-check-square"></i>
+                            <span class="hide-mobile">Select</span>
+                        </button>
+                        <button class="btn btn-secondary" onclick="openCreateFolderModal()">
+                            <i class="fas fa-folder-plus"></i>
+                            <span class="hide-mobile">New Folder</span>
+                        </button>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span class="hide-mobile">Upload</span>
+                            </button>
+                            <button class="btn btn-primary" onclick="document.getElementById('folderInput').click()"
+                                title="Upload Folder">
+                                <i class="fas fa-folder-open"></i>
+                            </button>
+                        </div>
+                        <input type="file" id="fileInput" multiple hidden onchange="handleFileSelect(event)">
+                        <input type="file" id="folderInput" webkitdirectory directory multiple hidden
+                            onchange="handleFolderSelect(event)">
+                    </div>
+                </header>
+
+                <!-- Selection Action Bar (hidden by default) -->
+                <div class="selection-bar hidden" id="selectionBar">
+                    <div class="selection-info">
+                        <button class="btn btn-ghost btn-sm" onclick="selectAll()">
+                            <i class="fas fa-check-double"></i> Select All
+                        </button>
+                        <span id="selectedCount">0 selected</span>
+                    </div>
+                    <div class="selection-actions">
+                        <button class="btn btn-primary btn-sm" onclick="downloadSelected()">
+                            <i class="fas fa-download"></i>
+                            <span class="hide-mobile">Download</span>
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="moveSelected()">
+                            <i class="fas fa-file-export"></i>
+                            <span class="hide-mobile">Move</span>
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteSelected()">
+                            <i class="fas fa-trash"></i>
+                            <span class="hide-mobile">Delete</span>
+                        </button>
+                        <button class="btn btn-ghost btn-sm" onclick="cancelSelection()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
 
-                <div class="flex gap-3">
-                    <button class="btn btn-ghost" id="selectModeBtn" onclick="toggleSelectMode()">
-                        <i class="fas fa-check-square"></i>
-                        <span class="hide-mobile">Select</span>
-                    </button>
-                    <button class="btn btn-secondary" onclick="openCreateFolderModal()">
-                        <i class="fas fa-folder-plus"></i>
-                        <span class="hide-mobile">New Folder</span>
-                    </button>
-                    <div class="btn-group">
-                        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                <!-- Content Body -->
+                <div class="content-body">
+                    <!-- Upload Zone -->
+                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-zone-icon">
                             <i class="fas fa-cloud-upload-alt"></i>
-                            <span class="hide-mobile">Upload</span>
-                        </button>
-                        <button class="btn btn-primary" onclick="document.getElementById('folderInput').click()"
-                            title="Upload Folder">
-                            <i class="fas fa-folder-open"></i>
-                        </button>
-                    </div>
-                    <input type="file" id="fileInput" multiple hidden onchange="handleFileSelect(event)">
-                    <input type="file" id="folderInput" webkitdirectory directory multiple hidden
-                        onchange="handleFolderSelect(event)">
-                </div>
-            </header>
-
-            <!-- Selection Action Bar (hidden by default) -->
-            <div class="selection-bar hidden" id="selectionBar">
-                <div class="selection-info">
-                    <button class="btn btn-ghost btn-sm" onclick="selectAll()">
-                        <i class="fas fa-check-double"></i> Select All
-                    </button>
-                    <span id="selectedCount">0 selected</span>
-                </div>
-                <div class="selection-actions">
-                    <button class="btn btn-primary btn-sm" onclick="downloadSelected()">
-                        <i class="fas fa-download"></i>
-                        <span class="hide-mobile">Download</span>
-                    </button>
-                    <button class="btn btn-secondary btn-sm" onclick="moveSelected()">
-                        <i class="fas fa-file-export"></i>
-                        <span class="hide-mobile">Move</span>
-                    </button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteSelected()">
-                        <i class="fas fa-trash"></i>
-                        <span class="hide-mobile">Delete</span>
-                    </button>
-                    <button class="btn btn-ghost btn-sm" onclick="cancelSelection()">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Content Body -->
-            <div class="content-body">
-                <!-- Upload Zone -->
-                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-                    <div class="upload-zone-icon">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                    </div>
-                    <div class="upload-zone-title">Drop files here or click to upload</div>
-                    <div class="upload-zone-text">
-                        Maximum file size: 2GB
-                    </div>
-                </div>
-
-                <!-- Upload Progress -->
-                <div id="uploadProgress" class="card mt-6 hidden">
-                    <div class="flex items-center justify-between mb-2">
-                        <span id="uploadStatus" class="text-secondary">Uploading...</span>
-                        <span id="uploadPercent" class="text-primary">0%</span>
-                    </div>
-                    <div id="uploadFileName" class="text-muted mb-2"
-                        style="font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-                    </div>
-                </div>
-
-                <!-- Ad Banner -->
-                <div class="card mt-6" style="text-align: center; padding: 12px;">
-                    <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Advertisement</p>
-                    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-1726377663312980"
-                        data-ad-slot="7827162592" data-ad-format="auto" data-full-width-responsive="true"></ins>
-                    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-                </div>
-
-                <!-- Files Grid -->
-                <div class="mt-6">
-                    {% if files %}
-                    <div class="file-grid" id="fileGrid">
-                        {% for file in files %}
-                        <div class="file-card animate-scale-up" data-id="{{ file.id if multi_user else file[0] }}"
-                            data-is-folder="{{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }}"
-                            onclick="handleFileClick(event, {{ file.id if multi_user else file[0] }}, {{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }})">
-
-                            <!-- Selection checkbox (hidden unless in select mode) -->
-                            <div class="file-select-checkbox"
-                                onclick="event.stopPropagation(); toggleFileSelection({{ file.id if multi_user else file[0] }})">
-                                <i class="far fa-square unchecked"></i>
-                                <i class="fas fa-check-square checked"></i>
-                            </div>
-
-                            <div class="file-actions">
-                                <button class="btn btn-icon btn-sm btn-ghost"
-                                    onclick="event.stopPropagation(); openFileMenu({{ file.id if multi_user else file[0] }}, '{{ (file.filename if multi_user else file[1])|e }}', {{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }})">
-                                    <i class="fas fa-ellipsis-v"></i>
-                                </button>
-                            </div>
-
-                            <div class="file-preview">
-                                {% set filename = file.filename if multi_user else file[1] %}
-                                {% set is_folder = file.is_folder if multi_user else file[5] %}
-                                {% set file_id = file.id if multi_user else file[0] %}
-
-                                {% if is_folder %}
-                                <i class="file-icon fas fa-folder" style="color: #fbbf24;"></i>
-                                {% elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) %}
-                                <img src="/thumbnail/{{ file_id }}" alt="{{ filename }}" loading="lazy"
-                                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                <i class="file-icon fas fa-image" style="display:none;"></i>
-                                {% elif filename.lower().endswith(('.mp4', '.mov', '.webm', '.mkv')) %}
-                                <i class="file-icon fas fa-video" style="color: #ef4444;"></i>
-                                {% elif filename.lower().endswith(('.mp3', '.wav', '.ogg', '.m4a')) %}
-                                <i class="file-icon fas fa-music" style="color: #8b5cf6;"></i>
-                                {% elif filename.lower().endswith(('.pdf')) %}
-                                <i class="file-icon fas fa-file-pdf" style="color: #ef4444;"></i>
-                                {% elif filename.lower().endswith(('.doc', '.docx')) %}
-                                <i class="file-icon fas fa-file-word" style="color: #3b82f6;"></i>
-                                {% elif filename.lower().endswith(('.zip', '.rar', '.7z', '.tar')) %}
-                                <i class="file-icon fas fa-file-archive" style="color: #f59e0b;"></i>
-                                {% else %}
-                                <i class="file-icon fas fa-file"></i>
-                                {% endif %}
-                            </div>
-
-                            <div class="file-name" title="{{ filename }}">{{ filename }}</div>
-                            <div class="file-meta">
-                                {% if is_folder %}
-                                Folder
-                                {% else %}
-                                {% set size = file.total_size or file.file_size or file.size or (file[2] if file is
-                                sequence else 0) %}
-                                {{ "%.1f"|format((size or 0) / 1024 / 1024) }} MB
-                                {% endif %}
-                            </div>
                         </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <div class="empty-state">
-                        <div class="empty-state-icon">
-                            <i class="fas fa-folder-open"></i>
+                        <div class="upload-zone-title">Drop files here or click to upload</div>
+                        <div class="upload-zone-text">
+                            Maximum file size: 2GB
                         </div>
-                        <h3 class="empty-state-title">No files yet</h3>
-                        <p class="empty-state-text">Upload your first file to get started</p>
-                        <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
-                            <i class="fas fa-cloud-upload-alt"></i> Upload Files
-                        </button>
                     </div>
-                {% endif %}
-            </div> <!-- End spa-content-container -->
-            {% if not is_ajax %}
+
+                    <!-- Upload Progress -->
+                    <div id="uploadProgress" class="card mt-6 hidden">
+                        <div class="flex items-center justify-between mb-2">
+                            <span id="uploadStatus" class="text-secondary">Uploading...</span>
+                            <span id="uploadPercent" class="text-primary">0%</span>
+                        </div>
+                        <div id="uploadFileName" class="text-muted mb-2"
+                            style="font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Ad Banner -->
+                    <div class="card mt-6" style="text-align: center; padding: 12px;">
+                        <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Advertisement</p>
+                        <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-1726377663312980"
+                            data-ad-slot="7827162592" data-ad-format="auto" data-full-width-responsive="true"></ins>
+                        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+                    </div>
+
+                    <!-- Files Grid -->
+                    <div class="mt-6">
+                        {% if files %}
+                        <div class="file-grid" id="fileGrid">
+                            {% for file in files %}
+                            <div class="file-card animate-scale-up" data-id="{{ file.id if multi_user else file[0] }}"
+                                data-is-folder="{{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }}"
+                                onclick="handleFileClick(event, {{ file.id if multi_user else file[0] }}, {{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }})">
+
+                                <!-- Selection checkbox (hidden unless in select mode) -->
+                                <div class="file-select-checkbox"
+                                    onclick="event.stopPropagation(); toggleFileSelection({{ file.id if multi_user else file[0] }})">
+                                    <i class="far fa-square unchecked"></i>
+                                    <i class="fas fa-check-square checked"></i>
+                                </div>
+
+                                <div class="file-actions">
+                                    <button class="btn btn-icon btn-sm btn-ghost"
+                                        onclick="event.stopPropagation(); openFileMenu({{ file.id if multi_user else file[0] }}, '{{ (file.filename if multi_user else file[1])|e }}', {{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }})">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                </div>
+
+                                <div class="file-preview">
+                                    {% set filename = file.filename if multi_user else file[1] %}
+                                    {% set is_folder = file.is_folder if multi_user else file[5] %}
+                                    {% set file_id = file.id if multi_user else file[0] %}
+
+                                    {% if is_folder %}
+                                    <i class="file-icon fas fa-folder" style="color: #fbbf24;"></i>
+                                    {% elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) %}
+                                    <img src="/thumbnail/{{ file_id }}" alt="{{ filename }}" loading="lazy"
+                                        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <i class="file-icon fas fa-image" style="display:none;"></i>
+                                    {% elif filename.lower().endswith(('.mp4', '.mov', '.webm', '.mkv')) %}
+                                    <i class="file-icon fas fa-video" style="color: #ef4444;"></i>
+                                    {% elif filename.lower().endswith(('.mp3', '.wav', '.ogg', '.m4a')) %}
+                                    <i class="file-icon fas fa-music" style="color: #8b5cf6;"></i>
+                                    {% elif filename.lower().endswith(('.pdf')) %}
+                                    <i class="file-icon fas fa-file-pdf" style="color: #ef4444;"></i>
+                                    {% elif filename.lower().endswith(('.doc', '.docx')) %}
+                                    <i class="file-icon fas fa-file-word" style="color: #3b82f6;"></i>
+                                    {% elif filename.lower().endswith(('.zip', '.rar', '.7z', '.tar')) %}
+                                    <i class="file-icon fas fa-file-archive" style="color: #f59e0b;"></i>
+                                    {% else %}
+                                    <i class="file-icon fas fa-file"></i>
+                                    {% endif %}
+                                </div>
+
+                                <div class="file-name" title="{{ filename }}">{{ filename }}</div>
+                                <div class="file-meta">
+                                    {% if is_folder %}
+                                    Folder
+                                    {% else %}
+                                    {% set size = file.total_size or file.file_size or file.size or (file[2] if file is
+                                    sequence else 0) %}
+                                    {{ "%.1f"|format((size or 0) / 1024 / 1024) }} MB
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="empty-state">
+                            <div class="empty-state-icon">
+                                <i class="fas fa-folder-open"></i>
+                            </div>
+                            <h3 class="empty-state-title">No files yet</h3>
+                            <p class="empty-state-text">Upload your first file to get started</p>
+                            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                <i class="fas fa-cloud-upload-alt"></i> Upload Files
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div> <!-- End spa-content-container -->
+                    {% if not is_ajax %}
         </main>
     </div>
 
@@ -1458,6 +1458,7 @@
             });
         }
     </script>
+    {% endif %}
 </body>
 
 </html>

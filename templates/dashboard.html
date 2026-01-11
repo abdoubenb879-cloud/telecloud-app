@@ -379,6 +379,7 @@
             navBar.style.width = '30%';
 
             try {
+                // We add ?ajax=true just to nudge the server, but we'll handle full pages too
                 const response = await fetch(url + (url.includes('?') ? '&' : '?') + 'ajax=true', {
                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 });
@@ -386,20 +387,37 @@
                 if (!response.ok) throw new Error('Navigation failed');
 
                 navBar.style.width = '70%';
-                const html = await response.text();
+                const htmlText = await response.text();
+
+                // Parse the response to extract the content container
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, 'text/html');
+                const newContent = doc.getElementById('spa-content-container');
+
+                if (!newContent) {
+                    console.warn('No spa-content-container found in response, falling back to full reload');
+                    window.location.href = url;
+                    return;
+                }
 
                 // Fade out current content
-                const oldContent = mainContent.querySelector('.content-body');
-                if (oldContent) oldContent.classList.add('fade-out');
+                const oldBody = mainContent.querySelector('.content-body');
+                if (oldBody) oldBody.classList.add('fade-out');
 
                 setTimeout(() => {
-                    // Update content
-                    mainContent.innerHTML = html;
+                    // Update content by replacing the container's innerHTML
+                    const currentContainer = document.getElementById('spa-content-container');
+                    if (currentContainer) {
+                        currentContainer.innerHTML = newContent.innerHTML;
+                    } else {
+                        // If container missing (shouldn't happen), replace host
+                        mainContent.innerHTML = newContent.outerHTML;
+                    }
 
                     // Fade in new content
-                    const newContent = mainContent.querySelector('.content-body');
-                    if (newContent) {
-                        newContent.classList.add('fade-in');
+                    const newBody = document.querySelector('#spa-content-container .content-body');
+                    if (newBody) {
+                        newBody.classList.add('fade-in');
                     }
 
                     // Update URL and history
@@ -409,6 +427,10 @@
 
                     // Update Active Nav Item
                     updateActiveNavItem(url);
+
+                    // Update Title
+                    const newTitle = doc.querySelector('title');
+                    if (newTitle) document.title = newTitle.textContent;
 
                     navBar.style.width = '100%';
                     setTimeout(() => { navBar.style.width = '0'; }, 300);
@@ -441,17 +463,23 @@
             }
         });
 
-        // Intercept sidebar clicks
-        document.querySelectorAll('.sidebar-nav a, .dropdown-item').forEach(link => {
-            link.addEventListener('click', (e) => {
+        // Intercept all internal link clicks for SPA
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('a');
+            if (link) {
                 const url = link.getAttribute('href');
                 if (url && !url.startsWith('http') && !url.startsWith('#') && !url.includes('logout')) {
+                    // Ensure it's not opening in a new tab
+                    if (e.ctrlKey || e.shiftKey || e.metaKey || link.target === '_blank') return;
+
                     e.preventDefault();
                     navigateSPA(url);
+
                     // Close mobile sidebar if open
-                    document.getElementById('sidebar').classList.remove('open');
+                    const sidebar = document.getElementById('sidebar');
+                    if (sidebar) sidebar.classList.remove('open');
                 }
-            });
+            }
         });
 
         // Global Upload Controller

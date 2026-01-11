@@ -99,7 +99,7 @@ class CloudDatabase:
         result = self._request("users", params={"telegram_id": f"eq.{telegram_id}", "select": "*"})
         return result[0] if result else None
 
-    def add_file(self, user_id, filename, total_size, chunk_count, parent_id=None):
+    def add_file(self, user_id, filename, total_size, chunk_count, parent_id=None, thumbnail=None):
         """Tracks an uploaded file for a specific user."""
         data = {
             "user_id": str(user_id),
@@ -107,7 +107,8 @@ class CloudDatabase:
             "total_size": total_size,
             "chunk_count": chunk_count,
             "parent_id": parent_id,
-            "is_folder": False
+            "is_folder": False,
+            "thumbnail": thumbnail
         }
         print(f"[DB DEBUG] Adding file with data: {data}")
         result = self._request("files", method="POST", data=data)

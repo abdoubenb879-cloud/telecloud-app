@@ -1498,6 +1498,41 @@ body.select-mode .file-card .file-actions {
     margin: 0 auto;
 }
 
+.m-checkmark {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: block;
+    stroke-width: 2;
+    stroke: var(--success);
+    stroke-miterlimit: 10;
+    margin: 0 auto;
+}
+
+.m-checkmark-circle {
+    stroke-dasharray: 166;
+    stroke-dashoffset: 166;
+    stroke-width: 2;
+    stroke-miterlimit: 10;
+    stroke: var(--success);
+    fill: none;
+    animation: m-checkmark-stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.m-checkmark-check {
+    transform-origin: 50% 50%;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    stroke-width: 3;
+    animation: m-checkmark-stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards;
+}
+
+@keyframes m-checkmark-stroke {
+    100% {
+        stroke-dashoffset: 0;
+    }
+}
+
 .checkmark {
     width: 80px;
     height: 80px;

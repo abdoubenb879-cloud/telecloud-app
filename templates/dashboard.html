@@ -555,41 +555,41 @@
         }
 
         // Download selected files as ZIP
+        // Download selected files sequentially
         async function downloadSelected() {
             if (selectedFiles.size === 0) {
                 await Modal.alert('No Selection', 'Please select files to download.');
                 return;
             }
 
-            showLoading(`Preparing ${selectedFiles.size} files for download...`);
+            const filesToDownload = Array.from(selectedFiles);
+            showLoading(`Starting sequential download for ${filesToDownload.length} files...`);
 
-            try {
-                const response = await fetch('/download/bulk', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({ file_ids: Array.from(selectedFiles) })
-                });
+            // Sequential download to avoid browser blocking multiple popups
+            for (let i = 0; i < filesToDownload.length; i++) {
+                const fileId = filesToDownload[i];
+                const card = document.querySelector(`[data-id="${fileId}"]`);
+                const filename = card ? card.querySelector('.file-name').textContent : `File_${fileId}`;
 
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'CloudVault-Download.zip';
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    hideLoading();
-                    cancelSelection();
-                } else {
-                    throw new Error('Download failed');
-                }
-            } catch (e) {
-                hideLoading();
-                await Modal.alert('Error', 'Failed to download files');
+                showLoading(`Preparing ${i + 1}/${filesToDownload.length}: ${filename}`);
+
+                // Trigger download via window.open or a hidden link
+                // window.open is more reliable for multiple downloads in some browsers if user allows popups
+                const downloadUrl = `/download/${fileId}`;
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => document.body.removeChild(a), 100);
+
+                // Delay between downloads to prevent browser from thinking it's spam
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
+
+            hideLoading();
+            cancelSelection();
+            Modal.alert('Downloads Started', 'All selected files have been triggered for download.');
         }
 
         // Delete selected files
@@ -1241,8 +1241,8 @@
             if (failedCount > 0) {
                 await Modal.alert('Upload Complete', `Uploaded ${totalFiles - failedCount} of ${totalFiles} files. ${failedCount} files failed.`);
             } else {
-                GlobalUpload.updateProgress(100, 'Done', 'Folder uploaded!', rootFolderName);
-                Modal.countdown('Folder Upload Complete!', `All ${totalFiles} files have been uploaded.`, 3, () => {
+                GlobalUpload.updateProgress(100, 'Done', 'Syncing Folder...', rootFolderName);
+                Modal.countdown('Transfer Complete!', `All ${totalFiles} files are being synced to the cloud. They will appear shortly.`, 5, () => {
                     if (window.location.pathname === '/') refreshFileGrid();
                 });
             }
@@ -1347,8 +1347,8 @@
             }
 
             // Success! 
-            GlobalUpload.updateProgress(100, 'Done', 'Upload complete!', 'Finished');
-            Modal.countdown('Upload Complete!', 'Your files have been safely stored.', 3, () => {
+            GlobalUpload.updateProgress(100, 'Done', 'Syncing with Cloud...', 'Finished');
+            Modal.countdown('Upload Transferred!', 'Your files are being synced to the cloud. They will appear in your dashboard in a few moments.', 5, () => {
                 if (window.location.pathname === '/') refreshFileGrid();
             });
         }

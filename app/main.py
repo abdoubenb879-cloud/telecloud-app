@@ -1503,25 +1503,35 @@ def download_shared(token):
             bot = get_bot_client()
             bot.connect()
             
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            print(f"[SHARE] Creating ZIP for folder...")
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_STORED) as zip_file:
                 for f_info in files:
                     try:
+                        print(f"[SHARE] Adding file to zip: {f_info['name']} (ID: {f_info['id']})")
                         chunks = db.get_chunks(f_info['id'])
-                        if not chunks: continue
+                        if not chunks: 
+                            print(f"[SHARE] WARNING: No chunks for file {f_info['id']}")
+                            continue
+                        
                         cdat = BytesIO()
                         for chunk in chunks:
                             mid = chunk['message_id']
                             cp = bot.download_media(mid)
                             if cp and os.path.exists(cp):
-                                with open(cp, 'rb') as f: cdat.write(f.read())
+                                with open(cp, 'rb') as f: 
+                                    cdat.write(f.read())
                                 os.remove(cp)
+                            else:
+                                print(f"[SHARE] ERROR: Chunk download failed for msg {mid}")
+
                         cdat.seek(0)
                         zip_file.writestr(f_info['path'], cdat.read())
                     except Exception as e:
-                        print(f"Zip add error: {e}")
+                        print(f"[SHARE] Zip add error for {f_info['name']}: {e}")
                         continue
             
             zip_buffer.seek(0)
+            print(f"[SHARE] ZIP creation complete. Size: {zip_buffer.getbuffer().nbytes} bytes. Sending to user.")
             return send_file(zip_buffer, mimetype='application/zip', as_attachment=True, download_name=f"{filename}.zip")
 
         # Handle Single File Download

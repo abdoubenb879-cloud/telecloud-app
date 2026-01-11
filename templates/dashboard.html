@@ -370,117 +370,9 @@
     <div id="navLoadingBar" class="nav-loading-bar"></div>
 
     <script src="{{ url_for('static', filename='modal.js') }}?v=5"></script>
+    <script src="{{ url_for('static', filename='app.js') }}?v={{ range(1, 10000) | random }}"></script>
     <script>
-        // SPA-lite Navigation Manager
-        async function navigateSPA(url, pushState = true) {
-            const navBar = document.getElementById('navLoadingBar');
-            const mainContent = document.getElementById('main-content-area');
-
-            navBar.style.width = '30%';
-
-            try {
-                // We add ?ajax=true just to nudge the server, but we'll handle full pages too
-                const response = await fetch(url + (url.includes('?') ? '&' : '?') + 'ajax=true', {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                });
-
-                if (!response.ok) throw new Error('Navigation failed');
-
-                navBar.style.width = '70%';
-                const htmlText = await response.text();
-
-                // Parse the response to extract the content container
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(htmlText, 'text/html');
-                const newContent = doc.getElementById('spa-content-container');
-
-                if (!newContent) {
-                    console.warn('No spa-content-container found in response, falling back to full reload');
-                    window.location.href = url;
-                    return;
-                }
-
-                // Fade out current content
-                const oldBody = mainContent.querySelector('.content-body');
-                if (oldBody) oldBody.classList.add('fade-out');
-
-                setTimeout(() => {
-                    // Update content by replacing the container's innerHTML
-                    const currentContainer = document.getElementById('spa-content-container');
-                    if (currentContainer) {
-                        currentContainer.innerHTML = newContent.innerHTML;
-                    } else {
-                        // If container missing (shouldn't happen), replace host
-                        mainContent.innerHTML = newContent.outerHTML;
-                    }
-
-                    // Fade in new content
-                    const newBody = document.querySelector('#spa-content-container .content-body');
-                    if (newBody) {
-                        newBody.classList.add('fade-in');
-                    }
-
-                    // Update URL and history
-                    if (pushState) {
-                        window.history.pushState({ url }, '', url);
-                    }
-
-                    // Update Active Nav Item
-                    updateActiveNavItem(url);
-
-                    // Update Title
-                    const newTitle = doc.querySelector('title');
-                    if (newTitle) document.title = newTitle.textContent;
-
-                    navBar.style.width = '100%';
-                    setTimeout(() => { navBar.style.width = '0'; }, 300);
-                }, 250);
-
-            } catch (error) {
-                console.error('SPA Navigation Error:', error);
-                window.location.href = url; // Fallback to full reload
-            }
-        }
-
-        function updateActiveNavItem(url) {
-            const path = new URL(url, window.location.origin).pathname;
-            document.querySelectorAll('.nav-item').forEach(item => {
-                const itemPath = new URL(item.href, window.location.origin).pathname;
-                if (path === itemPath) {
-                    item.classList.add('active');
-                } else {
-                    item.classList.remove('active');
-                }
-            });
-        }
-
-        // Handle browser Back/Forward
-        window.addEventListener('popstate', (e) => {
-            if (e.state && e.state.url) {
-                navigateSPA(e.state.url, false);
-            } else {
-                window.location.reload();
-            }
-        });
-
-        // Intercept all internal link clicks for SPA
-        document.addEventListener('click', (e) => {
-            const link = e.target.closest('a');
-            if (link) {
-                const url = link.getAttribute('href');
-                if (url && !url.startsWith('http') && !url.startsWith('#') && !url.includes('logout')) {
-                    // Ensure it's not opening in a new tab
-                    if (e.ctrlKey || e.shiftKey || e.metaKey || link.target === '_blank') return;
-
-                    e.preventDefault();
-                    navigateSPA(url);
-
-                    // Close mobile sidebar if open
-                    const sidebar = document.getElementById('sidebar');
-                    if (sidebar) sidebar.classList.remove('open');
-                }
-            }
-        });
+        // Dashboard-specific Logic (File Uploads, Selection Mode)
 
         // Global Upload Controller
         const GlobalUpload = {
@@ -512,16 +404,28 @@
             }
         };
 
-        // Global state and initialization
+        // Global state
         let currentFileId = null;
         let currentFileName = null;
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        // csrfToken is now in app.js, but we rely on the meta tag.
         const currentFolderId = {{ folder_id or 'null' }};
+
+        // Hide loading on page load
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) loadingOverlay.style.display = 'none';
+
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(reg => console.log('SW Registered'))
+                    .catch(err => console.log('SW Fail', err));
+            });
+        }
     </script>
     {% endif %}
     {% if not is_ajax %}
     <script>
-        // Global state again for consistency if needed, but the main state is above
         // Selection state
         let selectMode = false;
         let selectedFiles = new Set();
@@ -531,12 +435,13 @@
             selectMode = !selectMode;
             document.body.classList.toggle('select-mode', selectMode);
             const btn = document.getElementById('selectModeBtn');
-            btn.classList.toggle('active', selectMode);
+            if (btn) btn.classList.toggle('active', selectMode);
 
             if (!selectMode) {
                 cancelSelection();
             } else {
-                document.getElementById('selectionBar').classList.remove('hidden');
+                const bar = document.getElementById('selectionBar');
+                if (bar) bar.classList.remove('hidden');
             }
             updateSelectionCount();
         }
@@ -576,58 +481,48 @@
             document.querySelectorAll('.file-card.selected').forEach(card => {
                 card.classList.remove('selected');
             });
-            document.getElementById('selectionBar').classList.add('hidden');
+            const bar = document.getElementById('selectionBar');
+            if (bar) bar.classList.add('hidden');
             selectMode = false;
             document.body.classList.remove('select-mode');
-            document.getElementById('selectModeBtn').classList.remove('active');
+            const btn = document.getElementById('selectModeBtn');
+            if (btn) btn.classList.remove('active');
             updateSelectionCount();
+        }
+
+        // Update selection count display
+        function updateSelectionCount() {
+            const count = selectedFiles.size;
+            const countEl = document.getElementById('selectedCount');
+            if (countEl) countEl.textContent = `${count} selected`;
         }
 
         async function moveSelected() {
             if (selectedFiles.size === 0) return;
 
-            showLoading('Fetching folders...');
+            // Simple showLoading shim if not global
+            const loading = document.getElementById('loadingOverlay');
+            if (loading) loading.style.display = 'flex';
+
             try {
                 const res = await fetch('/api/folders');
                 const data = await res.json();
-                hideLoading();
+                if (loading) loading.style.display = 'none';
 
                 if (data.folders) {
-                    // Filter out folders that are currently selected to avoid moving a folder into itself
-                    // In a real app we'd also filter out subfolders of selected folders
                     const availableFolders = data.folders.filter(f => !selectedFiles.has(f.id));
-
                     let targetFolderId = await Modal.folderSelect(availableFolders);
 
-                    if (!targetFolderId) return;
+                    if (targetFolderId === null) return; // User cancelled
+                    if (targetFolderId === 'root') targetFolderId = null;
 
-                    if (targetFolderId === 'create_new') {
-                        const newName = await Modal.prompt('New Folder', 'Enter folder name:');
-                        if (!newName) return;
+                    if (loading) loading.style.display = 'flex';
 
-                        showLoading('Creating folder...');
-                        const createRes = await fetch('/create_folder_ajax', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': csrfToken
-                            },
-                            body: JSON.stringify({ name: newName, parent_id: currentFolderId })
-                        });
-                        const createData = await createRes.json();
-                        if (createData.folder_id) {
-                            targetFolderId = createData.folder_id;
-                        } else {
-                            throw new Error(createData.error || 'Failed to create folder');
-                        }
-                    }
-
-                    showLoading(`Moving ${selectedFiles.size} items...`);
-                    const moveRes = await fetch('/api/move/bulk', {
+                    const moveRes = await fetch('/move_files', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRFToken': csrfToken
+                            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
                         },
                         body: JSON.stringify({
                             file_ids: Array.from(selectedFiles),
@@ -636,26 +531,27 @@
                     });
 
                     const moveData = await moveRes.json();
-                    hideLoading();
+                    if (loading) loading.style.display = 'none';
 
                     if (moveData.message) {
                         cancelSelection();
-                        refreshFileGrid();
+                        refreshFileGrid(); // Make sure this is defined or handled
                         await Modal.alert('Success', moveData.message);
                     } else {
                         throw new Error(moveData.error || 'Move failed');
                     }
                 }
             } catch (e) {
-                hideLoading();
+                if (loading) loading.style.display = 'none';
                 await Modal.alert('Error', e.message || 'An error occurred during move');
             }
         }
 
-        // Update selection count display
-        function updateSelectionCount() {
-            const count = selectedFiles.size;
-            document.getElementById('selectedCount').textContent = `${count} selected`;
+        async function refreshFileGrid() {
+            // Check if we are on the dashboard
+            if (window.location.pathname !== '/') return;
+            // Simple reload for now to ensure consistency, or use SPA nav to self
+            navigateSPA(window.location.href, false);
         }
 
         // Download selected files as ZIP
@@ -672,7 +568,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
                     },
                     body: JSON.stringify({ file_ids: Array.from(selectedFiles) })
                 });
@@ -719,7 +615,7 @@
                 for (const fileId of selectedFiles) {
                     await fetch(`/delete/${fileId}`, {
                         method: 'POST',
-                        headers: { 'X-CSRFToken': csrfToken }
+                        headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content }
                     });
                 }
                 hideLoading();
@@ -730,24 +626,6 @@
                 await Modal.alert('Error', 'Failed to delete some files');
             }
         }
-
-        // Sidebar toggle
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('open');
-        }
-
-        // User menu
-        function toggleUserMenu() {
-            const menu = document.getElementById('userMenu');
-            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-        }
-
-        // Close menus on outside click
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.user-card')) {
-                document.getElementById('userMenu').style.display = 'none';
-            }
-        });
 
         // File click handler
         function handleFileClick(event, fileId, isFolder) {

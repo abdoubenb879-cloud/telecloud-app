@@ -76,6 +76,10 @@
     /* Sidebar */
     --sidebar-width: 260px;
     --sidebar-collapsed: 72px;
+
+    /* Fixed Heights */
+    --header-height: 80px;
+    --header-height-mobile: 64px;
 }
 
 /* ============= Reset & Base ============= */
@@ -335,15 +339,18 @@ a:hover {
 }
 
 .content-header {
-    padding: var(--space-5) var(--space-8);
+    height: var(--header-height);
+    padding: 0 var(--space-8);
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: var(--bg-secondary);
+    background: rgba(15, 15, 18, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     position: sticky;
     top: 0;
-    z-index: 50;
+    z-index: 1000;
 }
 
 .content-title {
@@ -607,24 +614,30 @@ a:hover {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--space-3) var(--space-8);
-    background: rgba(99, 102, 241, 0.1);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    padding: 0 var(--space-8);
+    height: 64px;
+    background: rgba(99, 102, 241, 0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-bottom: 2px solid var(--primary);
     position: sticky;
-    top: 72px;
-    /* Standard header height */
-    z-index: 100;
+    top: var(--header-height);
+    z-index: 999;
     margin-bottom: var(--space-4);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
 }
 
 /* Adjust for smaller screens where header height might change */
 @media (max-width: 768px) {
+    .content-header {
+        height: var(--header-height-mobile);
+        padding: 0 var(--space-4);
+    }
+
     .selection-bar {
-        top: 64px;
-        padding: var(--space-3) var(--space-4);
+        top: var(--header-height-mobile);
+        padding: 0 var(--space-4);
+        height: 56px;
     }
 }
 
@@ -1779,7 +1792,8 @@ body.select-mode .file-card .file-actions {
     color: var(--text-muted);
 }
 
-padding-left: 44px;
+.input-wrapper input {
+    padding-left: 44px;
 }
 
 @keyframes scaleUp {

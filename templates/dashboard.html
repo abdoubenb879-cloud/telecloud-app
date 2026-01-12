@@ -213,22 +213,13 @@
 
                                     {% if is_folder %}
                                     <i class="file-icon fas fa-folder" style="color: #fbbf24;"></i>
-                                    {% elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) %}
+                                    {% elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4',
+                                    '.mov', '.webm', '.mkv')) %}
                                     <img src="/thumbnail/{{ file_id }}" alt="{{ filename }}" loading="lazy"
                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                    <i class="file-icon fas fa-image" style="display:none;"></i>
-                                    {% elif filename.lower().endswith(('.mp4', '.mov', '.webm', '.mkv')) %}
-                                    <i class="file-icon fas fa-video" style="color: #ef4444;"></i>
-                                    {% elif filename.lower().endswith(('.mp3', '.wav', '.ogg', '.m4a')) %}
-                                    <i class="file-icon fas fa-music" style="color: #8b5cf6;"></i>
-                                    {% elif filename.lower().endswith(('.pdf')) %}
-                                    <i class="file-icon fas fa-file-pdf" style="color: #ef4444;"></i>
-                                    {% elif filename.lower().endswith(('.doc', '.docx')) %}
-                                    <i class="file-icon fas fa-file-word" style="color: #3b82f6;"></i>
-                                    {% elif filename.lower().endswith(('.zip', '.rar', '.7z', '.tar')) %}
-                                    <i class="file-icon fas fa-file-archive" style="color: #f59e0b;"></i>
+                                    <i class="file-icon fas {{ getFileIcon(filename) }}" style="display:none;"></i>
                                     {% else %}
-                                    <i class="file-icon fas fa-file"></i>
+                                    <i class="file-icon fas {{ getFileIcon(filename) }}"></i>
                                     {% endif %}
                                 </div>
 
@@ -974,10 +965,14 @@
                         grid.innerHTML = data.files.map(file => `
                             <div class="file-card" data-id="${file.id}" 
                                  onclick="handleFileClick(event, ${file.id}, ${file.is_folder})">
-                                <div class="file-preview">
+                                 <div class="file-preview">
                                     ${file.is_folder ?
                                 '<i class="file-icon fas fa-folder" style="color: #fbbf24;"></i>' :
-                                `<i class="file-icon fas ${getFileIcon(file.filename)}"></i>`
+                                ((file.filename.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp|mp4|mov|webm|mkv)$/)) ?
+                                    `<img src="/thumbnail/${file.id}" alt="${file.filename}" loading="lazy" 
+                                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                     <i class="file-icon fas ${getFileIcon(file.filename)}" style="display:none;"></i>` :
+                                    `<i class="file-icon fas ${getFileIcon(file.filename)}"></i>`)
                             }
                                 </div>
                                 <div class="file-info-row">
@@ -1197,6 +1192,7 @@
                 finishData.append('upload_id', uploadId);
                 finishData.append('filename', file.name);
                 finishData.append('total_chunks', totalChunks);
+                finishData.append('mime_type', file.type || 'application/octet-stream');
                 if (targetFolderId) finishData.append('parent_id', targetFolderId);
 
                 await fetch('/upload_finish', {

@@ -17,7 +17,15 @@ try:
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
-    print("[WARN] Pillow not installed. Thumbnails will be disabled.")
+    print("[WARN] Pillow not installed. Image thumbnails will be disabled.")
+
+# Video processing for thumbnails
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+    print("[WARN] OpenCV not installed. Video thumbnails will be disabled.")
 
 # Fix for Python 3.10+ where get_event_loop() fails if not started
 try:
@@ -1379,20 +1387,8 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
         print(f"[BG] Initializing BotClient...")
         bot = get_bot_client()
         
-        # Generate Thumbnail for images
-        thumbnail_filename = None
-        if mime_type.startswith('image/'):
-            try:
-                thumb_id = str(uuid.uuid4())[:8]
-                thumbnail_filename = f"thumb_{thumb_id}.jpg"
-                thumb_path = os.path.join(Config.UPLOAD_DIR, thumbnail_filename)
-                with Image.open(filepath) as img:
-                    img.thumbnail((200, 200))
-                    if img.mode != 'RGB': img = img.convert('RGB')
-                    img.save(thumb_path, "JPEG", quality=85)
-                print(f"[BG] Generated thumbnail: {thumbnail_filename}")
-            except Exception as te:
-                print(f"[BG] Thumbnail failed: {te}")
+        # Prepare for thumbnail generation (will do after file_id is known)
+        thumbnail_generated = False
 
         # Split file into chunks
         print(f"[BG] Splitting file {filepath} (Size: {file_size}, ChunkSize: {Config.CHUNK_SIZE})...")
@@ -1402,9 +1398,41 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
         # Add file entry to DB first to get file_id
         chunk_count = len(chunk_paths)
         if Config.MULTI_USER:
-             file_id = db.add_file(user_id, original_filename, file_size, chunk_count, parent_id=parent_id, thumbnail=thumbnail_filename)
+             file_id = db.add_file(user_id, original_filename, file_size, chunk_count, parent_id=parent_id)
         else:
-             file_id = db.add_file('local', original_filename, file_size, chunk_count, parent_id=parent_id, thumbnail=thumbnail_filename)
+             file_id = db.add_file('local', original_filename, file_size, chunk_count, parent_id=parent_id)
+
+        # Generate Thumbnail now that we have file_id
+        if file_id:
+            thumb_path = os.path.join(app.static_folder, 'thumbnails', f"{file_id}.jpg")
+            
+            # Handle Images
+            if mime_type.startswith('image/') and PIL_AVAILABLE:
+                try:
+                    with Image.open(filepath) as img:
+                        img.thumbnail((200, 200))
+                        if img.mode != 'RGB': img = img.convert('RGB')
+                        img.save(thumb_path, "JPEG", quality=85)
+                    print(f"[BG] Generated image thumbnail for file {file_id}")
+                except Exception as te:
+                    print(f"[BG] Image thumbnail failed: {te}")
+            
+            # Handle Videos
+            elif mime_type.startswith('video/') and CV2_AVAILABLE:
+                try:
+                    cap = cv2.VideoCapture(filepath)
+                    success, frame = cap.read()
+                    if success:
+                        # Resize while maintaining aspect ratio
+                        h, w = frame.shape[:2]
+                        scale = 200 / max(h, w)
+                        new_w, new_h = int(w * scale), int(h * scale)
+                        resized = cv2.resize(frame, (new_w, new_h))
+                        cv2.imwrite(thumb_path, resized)
+                        print(f"[BG] Generated video thumbnail for file {file_id}")
+                    cap.release()
+                except Exception as ve:
+                    print(f"[BG] Video thumbnail failed: {ve}")
 
         try:
             bot.connect()

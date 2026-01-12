@@ -105,6 +105,12 @@
             <div class="file-preview-large">
                 {% if is_folder %}
                 <i class="fas fa-folder" style="color: #fbbf24;"></i>
+                {% elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.webm',
+                '.mkv')) %}
+                <img src="/thumbnail/{{ file_id }}" alt="{{ filename }}"
+                    style="width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-xl);"
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <i class="fas fa-file-download" style="display:none;"></i>
                 {% else %}
                 <i class="fas fa-file-download"></i>
                 {% endif %}

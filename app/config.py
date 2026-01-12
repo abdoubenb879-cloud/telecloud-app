@@ -22,8 +22,8 @@ class Config:
     MULTI_USER = os.getenv("MULTI_USER", "false").lower() == "true"
     SECRET_KEY = os.getenv("SECRET_KEY", "telecloud_secret_vault") # For session encryption
     
-    # 1.9GB to stay safely under Telegram's 2GB limit
-    CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 1900000000))
+    # 20MB chunks for better parallelization in cloud mode
+    CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 20 * 1024 * 1024))
     
     # Directories
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

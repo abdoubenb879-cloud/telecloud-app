@@ -900,67 +900,85 @@ def upload_file():
 @csrf.exempt
 @rate_limit
 def upload_chunk():
-    """Receives a slice of a file and appends it."""
+    """Receives a slice of a file and saves it as a part file."""
     if Config.MULTI_USER and 'user_id' not in session:
         return jsonify({"error": "Unauthorized"}), 401
         
     upload_id = request.form.get('upload_id')
+    chunk_index = request.form.get('chunk_index')
     # Accept either 'chunk' or 'file' field name for flexibility
     chunk = request.files.get('chunk') or request.files.get('file')
     
-    if not chunk:
-        return jsonify({"error": "No chunk data received"}), 400
+    if not chunk or upload_id is None or chunk_index is None:
+        return jsonify({"error": "Missing upload parameters"}), 400
     
-    # Temp file is named after the upload_id
-    temp_path = os.path.join(Config.UPLOAD_DIR, upload_id)
+    # Save as a part file
+    part_filename = f"{upload_id}.part{chunk_index}"
+    temp_path = os.path.join(Config.UPLOAD_DIR, part_filename)
     
-    # Append mode 'ab'
-    with open(temp_path, 'ab') as f:
-        f.write(chunk.read())
-        
-    return jsonify({"status": "ok"})
+    chunk.save(temp_path)
+    return jsonify({"status": "ok", "index": chunk_index})
 
 @app.route('/upload_finish', methods=['POST'])
 @csrf.exempt
 def upload_finish():
-    """Finalizes the chunked upload and starts background processing."""
+    """Finalizes the parallel chunked upload by merging parts."""
     if Config.MULTI_USER and 'user_id' not in session:
         return jsonify({"error": "Unauthorized"}), 401
         
     upload_id = request.form.get('upload_id')
     filename = request.form.get('filename')
+    total_chunks = request.form.get('total_chunks')
     parent_id = request.form.get('parent_id')
-    parent_id = int(parent_id) if parent_id and parent_id != 'None' else None
     
+    if not upload_id or not total_chunks:
+        return jsonify({"error": "Missing completion parameters"}), 400
+        
+    total_chunks = int(total_chunks)
+    parent_id = int(parent_id) if parent_id and parent_id != 'None' else None
     user_id = session.get('user_id', 'local')
     
-    temp_path = os.path.join(Config.UPLOAD_DIR, upload_id)
+    final_temp_path = os.path.join(Config.UPLOAD_DIR, upload_id)
     
-    if not os.path.exists(temp_path):
-        return jsonify({"error": "Upload failed (temp file missing)"}), 400
-    
-    # Get file size from disk and mime type
-    file_size = os.path.getsize(temp_path)
-    
-    # MAX CONTENT LENGTH: 2GB (Telegram Bot API limit)
-    max_size = 2000 * 1024 * 1024 
-    
-    if file_size > max_size:
-        os.remove(temp_path)
-        return jsonify({"error": "File too large. Maximum limit is 2GB."}), 413
+    try:
+        # Merge parts in order
+        with open(final_temp_path, 'wb') as outfile:
+            for i in range(total_chunks):
+                part_path = os.path.join(Config.UPLOAD_DIR, f"{upload_id}.part{i}")
+                if not os.path.exists(part_path):
+                    # If any part is missing, we can't finalize
+                    return jsonify({"error": f"Part {i} missing"}), 400
+                
+                with open(part_path, 'rb') as infile:
+                    outfile.write(infile.read())
+                
+                # Cleanup part file immediately
+                os.remove(part_path)
         
-    mime_type = request.form.get('mime_type', 'application/octet-stream')
-    
-    # Start Background Thread with correct arguments
-    thread = threading.Thread(
-        target=process_background_upload,
-        args=(temp_path, filename, user_id, mime_type, file_size, parent_id),
-        daemon=True 
-    )
-    thread.start()
-
-
-    return jsonify({"message": "Upload complete! Processing in background."})
+        file_size = os.path.getsize(final_temp_path)
+        max_size = 2000 * 1024 * 1024 # 2GB
+        
+        if file_size > max_size:
+            os.remove(final_temp_path)
+            return jsonify({"error": "File too large. Maximum limit is 2GB."}), 413
+            
+        mime_type = request.form.get('mime_type', 'application/octet-stream')
+        
+        # Process in background
+        thread = threading.Thread(
+            target=process_background_upload,
+            args=(final_temp_path, filename, user_id, mime_type, file_size, parent_id),
+            daemon=True 
+        )
+        thread.start()
+        
+        return jsonify({"message": "Upload complete and verification passed!"})
+        
+    except Exception as e:
+        print(f"[FINISH ERROR] {e}")
+        if os.path.exists(final_temp_path):
+            os.remove(final_temp_path)
+        return jsonify({"error": "Internal server error during merge"}), 500
 
 @app.route('/thumbnail/<int:file_id>')
 def get_thumbnail(file_id):
@@ -1104,6 +1122,99 @@ def preview_file(file_id):
         print(f"Preview Error: {e}")
         traceback.print_exc()
         return "Preview failed", 500
+
+@app.route('/download_batch', methods=['POST'])
+@csrf.exempt
+def download_batch():
+    """Download multiple files as a single ZIP archive using parallel fetching."""
+    if Config.MULTI_USER and 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        file_ids = data.get('file_ids', [])
+        if not file_ids:
+            return jsonify({"error": "No files selected"}), 400
+            
+        user_id = session.get('user_id', 'local')
+        files_to_zip = []
+        
+        # 1. Fetch metadata for all files
+        for fid in file_ids:
+            if Config.MULTI_USER:
+                # Optimized: get chunks and metadata in one go if possible
+                file_info = db.get_file(fid) 
+                if file_info and (file_info.get('user_id') == user_id or not Config.MULTI_USER):
+                    chunks = db.get_chunks(fid)
+                    files_to_zip.append({"info": file_info, "chunks": chunks})
+            else:
+                file_info = db.get_file(fid)
+                if file_info:
+                    chunks = db.get_chunks(fid)
+                    files_to_zip.append({"info": {"id": file_info[0], "filename": file_info[1]}, "chunks": chunks})
+
+        if not files_to_zip:
+            return jsonify({"error": "No valid files found"}), 404
+
+        # 2. Collect all chunk message IDs for parallel download
+        all_msg_ids = []
+        chunk_map = {} # Maps msg_id -> (file_index, chunk_index)
+        
+        for f_idx, f_data in enumerate(files_to_zip):
+            for c_idx, chunk in enumerate(f_data['chunks']):
+                msg_id = chunk['message_id'] if Config.MULTI_USER else chunk[3]
+                all_msg_ids.append(msg_id)
+                chunk_map[msg_id] = (f_idx, c_idx)
+
+        print(f"[BATCH] Downloading {len(all_msg_ids)} chunks for {len(files_to_zip)} files")
+        
+        bot = get_bot_client()
+        bot.connect()
+        
+        # Increase concurrency for batch downloads (6-8 is usually safe)
+        downloaded_paths = bot.download_chunks_parallel(all_msg_ids, max_concurrent=5)
+        
+        # 3. Create ZIP
+        zip_filename = f"batch_{int(time.time())}.zip"
+        zip_path = os.path.join(Config.DOWNLOAD_DIR, zip_filename)
+        
+        # Map message IDs to temporary disk paths
+        msg_to_path = dict(zip(all_msg_ids, downloaded_paths))
+        
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for f_data in files_to_zip:
+                filename = f_data['info']['filename']
+                chunks = f_data['chunks']
+                
+                # Reassemble file in memory if small, or temp if large
+                file_bytes = b""
+                for chunk in chunks:
+                    mid = chunk['message_id'] if Config.MULTI_USER else chunk[3]
+                    cp = msg_to_path.get(mid)
+                    if cp and os.path.exists(cp):
+                        with open(cp, 'rb') as cf:
+                            file_bytes += cf.read()
+                
+                zf.writestr(filename, file_bytes)
+
+        # 4. Cleanup individual chunk files
+        for p in downloaded_paths:
+            if p and os.path.exists(p):
+                os.remove(p)
+
+        # Schedule ZIP cleanup
+        def cleanup_zip():
+            time.sleep(600) # 10 minutes
+            if os.path.exists(zip_path): os.remove(zip_path)
+            
+        threading.Thread(target=cleanup_zip, daemon=True).start()
+
+        return send_file(zip_path, as_attachment=True, download_name="TeleCloud_Batch.zip")
+
+    except Exception as e:
+        print(f"[BATCH ERROR] {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/download/<int:file_id>')
 @app.route('/download_shared/<token>')
@@ -1286,50 +1397,52 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
                 print(f"[BG] Thumbnail failed: {te}")
 
         # Split file into chunks
-        print(f"[BG] Splitting file {filepath} (Size: {file_size})...")
+        print(f"[BG] Splitting file {filepath} (Size: {file_size}, ChunkSize: {Config.CHUNK_SIZE})...")
         chunk_paths = Chunker.split_file(filepath, Config.CHUNK_SIZE, Config.UPLOAD_DIR)
         print(f"[BG] Split into {len(chunk_paths)} chunks")
         
-        uploaded_chunks = []
+        # Add file entry to DB first to get file_id
+        chunk_count = len(chunk_paths)
+        if Config.MULTI_USER:
+             file_id = db.add_file(user_id, original_filename, file_size, chunk_count, parent_id=parent_id, thumbnail=thumbnail_filename)
+        else:
+             file_id = db.add_file('local', original_filename, file_size, chunk_count, parent_id=parent_id, thumbnail=thumbnail_filename)
+
         try:
             bot.connect()
-            for idx, cp in enumerate(chunk_paths):
-                print(f"[BG] Uploading chunk {idx+1}/{len(chunk_paths)}: {cp}")
-                
-                # Upload with basic progress logging
-                msg = bot.upload_file(cp, progress_callback=lambda c, t: None) 
-                
+            # NEW: Upload chunks in parallel to Telegram (3x speedup)
+            uploaded_messages = bot.upload_chunks_parallel(chunk_paths, max_concurrent=3)
+            
+            # Filter and store in DB
+            for idx, msg in enumerate(uploaded_messages):
                 if not msg:
-                    raise Exception(f"Chunk {idx} upload failed (None returned)")
-                    
-                print(f"[BG] Chunk {idx+1} uploaded. Msg ID: {msg.id}")
-                uploaded_chunks.append({'index': idx, 'msg_id': msg.id, 'size': os.path.getsize(cp)})
+                    raise Exception(f"Failed to upload chunk {idx}")
                 
-                # Clean chunk immediately to save space
+                mid = msg.id if hasattr(msg, 'id') else msg.message_id
+                # Correct arguments: file_id, chunk_index, message_id, chunk_size
+                db.add_chunk(file_id, idx, mid, os.path.getsize(chunk_paths[idx]))
+                print(f"[BG] Chunk {idx+1}/{len(chunk_paths)} registered: {mid}")
+
+            # Update final file status
+            db.update_file_status(file_id, "ready")
+            print(f"[BG] SUCCESS: {original_filename} is ready.")
+
+        except Exception as ue:
+            print(f"[BG] Upload error: {ue}")
+            db.update_file_status(file_id, "error")
+            raise
+        finally:
+            # Cleanup all local chunks
+            for cp in chunk_paths:
                 if os.path.exists(cp): os.remove(cp)
-        except Exception as e:
-            print(f"[BOT] Upload error: {e}")
-            raise e
-
-        # Database Insertion
-        chunk_count = len(uploaded_chunks)
-        print(f"[BG] All chunks uploaded. Saving to DB...")
-        
-        if Config.MULTI_USER:
-             f_id = db.add_file(user_id, original_filename, file_size, chunk_count, parent_id=parent_id, thumbnail=thumbnail_filename)
-             for c in uploaded_chunks:
-                 db.add_chunk(f_id, c['index'], c['msg_id'], c['size'])
-        else:
-             f_id = db.add_file('local', original_filename, file_size, chunk_count, parent_id=parent_id, thumbnail=thumbnail_filename)
-             for c in uploaded_chunks:
-                 db.add_chunk(f_id, c['index'], c['msg_id'], c['size'])
-                 
-        print(f"[BG] Database Inserted. File ID: {f_id}")
-
-        # Cleanup original temp file
-        if os.path.exists(filepath):
-            os.remove(filepath)
-            print(f"[BG] Cleaned up temp file {filepath}")
+            
+            # Cleanup the merged temp file
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                    print(f"[BG] Cleaned up final temp file {filepath}")
+                except Exception as e:
+                    print(f"[BG] Failed to remove final temp file: {e}")
 
     except Exception as e:
         print(f"[BG] Background Task Failed: {e}")

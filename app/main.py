@@ -1052,7 +1052,8 @@ def preview_file(file_id):
         mime_type, _ = mimetypes.guess_type(filename)
         if not mime_type: mime_type = 'application/octet-stream'
         
-        if not chunks: return "File content not found", 404
+        if not chunks:
+            return "File is still processing. Please wait a moment and try again.", 202
         
         # Build a unique cache path for this file
         cache_filename = f"preview_{file_id}_{filename}"

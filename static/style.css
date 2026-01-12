@@ -336,6 +336,8 @@ a:hover {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    position: relative;
+    /* Removed overflow-x: hidden to fix position: sticky */
 }
 
 .content-header {
@@ -1899,11 +1901,6 @@ body.select-mode .file-card .file-actions {
 }
 
 /* SPA-lite Transitions */
-.main-content {
-    position: relative;
-    overflow-x: hidden;
-}
-
 .content-body {
     transition: opacity 0.25s ease, transform 0.25s ease;
 }

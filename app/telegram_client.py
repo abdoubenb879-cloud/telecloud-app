@@ -337,6 +337,25 @@ class BotClient:
             
         return self._run_async(work())
 
+    def download_chunks_parallel(self, message_ids, max_concurrent=3):
+        """Download multiple chunks in parallel for faster downloads."""
+        async def download_single(msg_id):
+            msg = await self.client.get_messages(self.channel_id, msg_id)
+            if not msg or not msg.document:
+                return None
+            return await self.client.download_media(msg, in_memory=False)
+        
+        async def work():
+            # Process in batches to limit concurrent downloads
+            results = []
+            for i in range(0, len(message_ids), max_concurrent):
+                batch = message_ids[i:i + max_concurrent]
+                batch_results = await asyncio.gather(*[download_single(mid) for mid in batch])
+                results.extend(batch_results)
+            return results
+            
+        return self._run_async(work())
+
 
 # Global bot instance (lazy initialization)
 _bot_instance = None

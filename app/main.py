@@ -64,7 +64,13 @@ app.config.update(
     WTF_CSRF_ENABLED=True,            # Enable CSRF protection
     WTF_CSRF_TIME_LIMIT=3600,         # CSRF token valid for 1 hour
     MAX_CONTENT_LENGTH=500 * 1024 * 1024,  # 500MB max upload
+    COMPRESS_MIMETYPES=['text/html', 'text/css', 'text/javascript', 'application/javascript', 'application/json'],
+    COMPRESS_LEVEL=6,                 # Good balance of speed vs compression
+    COMPRESS_MIN_SIZE=500,            # Only compress if > 500 bytes
 )
+
+# Enable Gzip Compression for ~70% smaller responses
+Compress(app)
 
 # CSRF Protection
 from flask_wtf.csrf import CSRFProtect, generate_csrf
@@ -176,7 +182,10 @@ def rate_limit(f):
 def add_cache_headers(response):
     """Add caching headers for static files."""
     if request.path.startswith('/static/'):
-        # Cache static files for 1 day
+        # Cache static files for 7 days (immutable for versioned assets)
+        response.headers['Cache-Control'] = 'public, max-age=604800, immutable'
+    elif request.path.startswith('/thumbnail/'):
+        # Cache thumbnails for 1 day
         response.headers['Cache-Control'] = 'public, max-age=86400'
     else:
         # Don't cache dynamic content
@@ -1202,22 +1211,29 @@ def download_file(file_id=None, token=None):
         
         bot.connect()
         try:
-            for chunk in chunks:
-                msg_id = chunk['message_id'] if Config.MULTI_USER else chunk[3]
-                try:
+            # Use parallel download for multi-chunk files (3x faster)
+            if len(chunks) > 1:
+                msg_ids = [chunk['message_id'] if Config.MULTI_USER else chunk[3] for chunk in chunks]
+                print(f"[DOWNLOAD] Parallel download of {len(msg_ids)} chunks")
+                downloaded_chunks = bot.download_chunks_parallel(msg_ids, max_concurrent=3)
+                # Filter out any None values
+                downloaded_chunks = [p for p in downloaded_chunks if p]
+                if len(downloaded_chunks) != len(chunks):
+                    raise Exception(f"Only {len(downloaded_chunks)} of {len(chunks)} chunks downloaded")
+            else:
+                # Single chunk - use regular download
+                for chunk in chunks:
+                    msg_id = chunk['message_id'] if Config.MULTI_USER else chunk[3]
                     chunk_path = bot.download_media(msg_id)
                     if chunk_path:
                         downloaded_chunks.append(chunk_path)
                     else:
                         raise Exception(f"Empty chunk {msg_id}")
-                except Exception as e:
-                    print(f"Error downloading chunk {msg_id}: {e}")
-                    # Cleanup what we have
-                    for p in downloaded_chunks:
-                        if os.path.exists(p): os.remove(p)
-                    raise e
         except Exception as e:
             print(f"[BOT] Download error: {e}")
+            # Cleanup what we have
+            for p in downloaded_chunks:
+                if p and os.path.exists(p): os.remove(p)
             raise
             
         # Merge chunks

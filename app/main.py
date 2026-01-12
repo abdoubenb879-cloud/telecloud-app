@@ -1020,9 +1020,8 @@ def get_thumbnail(file_id):
     if os.path.exists(thumb_path):
         return send_file(thumb_path, mimetype='image/jpeg')
     
-    # Return 1x1 transparent PNG (prevents 404 console spam)
-    transparent_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82'
-    return Response(transparent_png, mimetype='image/png', status=200)
+    # Return 404 to trigger onerror fallback in frontend
+    return '', 404
 
 import mimetypes
 from flask import Response, stream_with_context

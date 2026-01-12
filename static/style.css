@@ -608,8 +608,24 @@ a:hover {
     align-items: center;
     justify-content: space-between;
     padding: var(--space-3) var(--space-8);
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.1));
-    border-bottom: 1px solid var(--primary);
+    background: rgba(99, 102, 241, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 2px solid var(--primary);
+    position: sticky;
+    top: 72px;
+    /* Standard header height */
+    z-index: 100;
+    margin-bottom: var(--space-4);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Adjust for smaller screens where header height might change */
+@media (max-width: 768px) {
+    .selection-bar {
+        top: 64px;
+        padding: var(--space-3) var(--space-4);
+    }
 }
 
 .selection-info {

@@ -1467,12 +1467,12 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
                 print(f"[BG] Chunk {idx+1}/{len(chunk_paths)} registered: {mid}")
 
             # Update final file status
-            db.update_file_status(file_id, "ready")
+            # db.update_file_status(file_id, "ready")  # TODO: Add status column to Supabase schema
             print(f"[BG] SUCCESS: {original_filename} is ready.")
 
         except Exception as ue:
             print(f"[BG] Upload error: {ue}")
-            db.update_file_status(file_id, "error")
+            # db.update_file_status(file_id, "error")  # TODO: Add status column to Supabase schema
             raise
         finally:
             # Cleanup all local chunks

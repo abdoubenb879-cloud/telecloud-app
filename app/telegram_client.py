@@ -270,13 +270,15 @@ class BotClient:
         return future.result(timeout=6000)
     
     def connect(self):
-        """Start the bot client."""
-        if not self._connected:
-            async def work():
-                await self.client.start()
-            self._run_async(work())
-            self._connected = True
-            print(f"[BOT] Connected to channel {self.channel_id}")
+        """Start the bot client (thread-safe)."""
+        # Use lock to prevent multiple threads from triggering simultaneous auth
+        with BotClient._lock:
+            if not self._connected:
+                async def work():
+                    await self.client.start()
+                self._run_async(work())
+                self._connected = True
+                print(f"[BOT] Connected to channel {self.channel_id}")
         return self
     
     def stop(self):

@@ -1841,6 +1841,16 @@ def download_shared(token):
 os.makedirs(Config.UPLOAD_DIR, exist_ok=True)
 os.makedirs(Config.DOWNLOAD_DIR, exist_ok=True)
 
+# Pre-connect the bot at startup to avoid race conditions during first uploads
+print("[INIT] Pre-connecting bot client...")
+try:
+    bot = get_bot_client()
+    bot.connect()
+    print("[INIT] Bot client connected and ready for uploads!")
+except Exception as e:
+    print(f"[INIT] WARNING: Bot pre-connection failed: {e}")
+    print("[INIT] Bot will attempt to connect on first upload request.")
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False, threaded=True)

@@ -158,8 +158,8 @@ def log_request():
 # Enable gzip compression for all responses
 Compress(app)
 
-# Rate limiting configuration
-RATE_LIMIT = 30  # requests per minute
+# Rate limiting configuration (generous for large batch uploads)
+RATE_LIMIT = 500  # requests per minute (supports 4000+ file uploads)
 RATE_WINDOW = 60  # seconds
 rate_limit_data = defaultdict(list)
 

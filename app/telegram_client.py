@@ -264,21 +264,49 @@ class BotClient:
         self._initialized = True
         print("[BOT] BotClient initialized successfully")
     
-    def _run_async(self, coro):
-        """Run async operation in the background loop."""
+    def _run_async(self, coro, timeout=120):
+        """Run async operation in the background loop with timeout."""
         future = asyncio.run_coroutine_threadsafe(coro, _loop)
-        return future.result(timeout=6000)
+        return future.result(timeout=timeout)
     
-    def connect(self):
-        """Start the bot client (thread-safe)."""
+    def connect(self, max_retries=2):
+        """Start the bot client (thread-safe with timeout and FloodWait handling)."""
+        from pyrogram.errors import FloodWait
+        import time as time_module
+        
         # Use lock to prevent multiple threads from triggering simultaneous auth
         with BotClient._lock:
-            if not self._connected:
-                async def work():
-                    await self.client.start()
-                self._run_async(work())
-                self._connected = True
-                print(f"[BOT] Connected to channel {self.channel_id}")
+            if self._connected:
+                return self
+                
+            for attempt in range(max_retries):
+                try:
+                    async def work():
+                        await self.client.start()
+                    
+                    # Use 60 second timeout to prevent hanging forever
+                    self._run_async(work(), timeout=60)
+                    self._connected = True
+                    print(f"[BOT] Connected to channel {self.channel_id}")
+                    return self
+                    
+                except FloodWait as fw:
+                    wait_time = fw.value if hasattr(fw, 'value') else 60
+                    print(f"[BOT] FloodWait: Must wait {wait_time} seconds before retry")
+                    if attempt < max_retries - 1 and wait_time <= 120:
+                        # Only wait if it's a reasonable time
+                        time_module.sleep(min(wait_time + 5, 120))
+                    else:
+                        print(f"[BOT] FloodWait too long ({wait_time}s), will retry on next request")
+                        raise
+                        
+                except Exception as e:
+                    print(f"[BOT] Connection attempt {attempt+1} failed: {e}")
+                    if attempt < max_retries - 1:
+                        time_module.sleep(5)
+                    else:
+                        raise
+        
         return self
     
     def stop(self):

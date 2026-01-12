@@ -388,23 +388,34 @@ class BotClient:
     def upload_chunks_parallel(self, chunk_paths, max_concurrent=3):
         """Upload multiple chunks in parallel to Telegram."""
         target = self.channel_id
+        print(f"[BOT] Starting parallel upload of {len(chunk_paths)} chunks to channel {target}")
         
-        async def upload_single(cp):
-            return await self.client.send_document(
-                target,
-                document=cp,
-                file_name=os.path.basename(cp)
-            )
+        async def upload_single(cp, idx):
+            print(f"[BOT] Uploading chunk {idx+1}/{len(chunk_paths)}: {os.path.basename(cp)}")
+            try:
+                result = await self.client.send_document(
+                    target,
+                    document=cp,
+                    file_name=os.path.basename(cp)
+                )
+                print(f"[BOT] Chunk {idx+1} uploaded successfully, msg_id: {result.id}")
+                return result
+            except Exception as e:
+                print(f"[BOT] Chunk {idx+1} upload FAILED: {e}")
+                raise
         
         async def work():
             results = []
             for i in range(0, len(chunk_paths), max_concurrent):
                 batch = chunk_paths[i:i + max_concurrent]
-                batch_results = await asyncio.gather(*[upload_single(cp) for cp in batch])
+                batch_indices = list(range(i, min(i + max_concurrent, len(chunk_paths))))
+                print(f"[BOT] Processing batch: chunks {batch_indices}")
+                batch_results = await asyncio.gather(*[upload_single(cp, idx) for idx, cp in zip(batch_indices, batch)])
                 results.extend(batch_results)
             return results
-            
-        return self._run_async(work())
+        
+        # Use 10 minute timeout for large file uploads
+        return self._run_async(work(), timeout=600)
 
 
 # Global bot instance (lazy initialization)

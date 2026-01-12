@@ -107,8 +107,8 @@ class CloudDatabase:
             "total_size": total_size,
             "chunk_count": chunk_count,
             "parent_id": parent_id,
-            "is_folder": False,
-            "thumbnail": thumbnail
+            "is_folder": False
+            # Note: thumbnail column doesn't exist in current Supabase schema
         }
         print(f"[DB DEBUG] Adding file with data: {data}")
         result = self._request("files", method="POST", data=data)

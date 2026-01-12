@@ -228,6 +228,21 @@ class CloudDatabase:
             "user_id": f"eq.{user_id}"
         })
 
+    def move_files_bulk(self, file_ids, user_id, new_parent_id):
+        """Update parent folder for multiple files in one request."""
+        if not file_ids:
+            return True
+        
+        # Format IDs for Supabase 'in' operator: (id1,id2,id3)
+        ids_str = ",".join(map(str, file_ids))
+        data = {"parent_id": new_parent_id}
+        
+        print(f"[DB] Bulk moving {len(file_ids)} files to folder {new_parent_id}")
+        return self._request("files", method="PATCH", data=data, params={
+            "id": f"in.({ids_str})",
+            "user_id": f"eq.{user_id}"
+        })
+
     def delete_file(self, file_id, user_id):
         """Deletes a file and its chunks (Supabase handles cascade if configured)."""
         # First delete chunks

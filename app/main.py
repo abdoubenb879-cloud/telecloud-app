@@ -1338,6 +1338,34 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
         if os.path.exists(filepath):
             os.remove(filepath)
 
+@app.route('/move_files', methods=['POST'])
+@csrf.exempt
+def move_files():
+    """Batch move files to a target folder."""
+    if Config.MULTI_USER and 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        file_ids = data.get('file_ids', [])
+        # Important: target_folder_id is explicitly allowed to be None (root)
+        target_folder_id = data.get('target_folder_id')
+        user_id = session.get('user_id', 'local')
+        
+        if not file_ids:
+            return jsonify({"error": "No files selected"}), 400
+            
+        db.move_files_bulk(file_ids, user_id, target_folder_id)
+        
+        return jsonify({"message": f"Successfully moved {len(file_ids)} files"})
+        
+    except Exception as e:
+        print(f"[MOVE ERROR] {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/delete/<int:file_id>', methods=['POST'])
 @csrf.exempt
 def delete_file_route(file_id):

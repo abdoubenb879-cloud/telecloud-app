@@ -1090,30 +1090,47 @@
         const UploadManager = {
             queue: [],
             activeRequests: 0,
-            maxConcurrent: 8,
+            maxConcurrent: 6, // Total parallel requests (browser limit)
+            maxFiles: 2,      // Max files processing at once
+            chunksPerFile: 3, // Max chunks per file
             uploadedBytes: 0,
             totalBytes: 0,
             startTime: null,
-            timer: null,
             isProcessing: false,
             uploadedFilesCount: 0,
             totalFilesCount: 0,
 
+            // Speed Calculation (Sliding Window)
+            progressLog: [], // {time, bytes}
+
+            // Atomic Folder Creation
+            folderCache: {},
+            folderCreationQueue: {}, // path -> promise
+
             async init(files, isFolder = false) {
+                if (this.isProcessing) {
+                    this.queue.push(...Array.from(files));
+                    this.totalFilesCount += files.length;
+                    this.totalBytes += Array.from(files).reduce((acc, f) => acc + f.size, 0);
+                    return;
+                }
+
                 this.queue = Array.from(files);
                 this.totalFilesCount = this.queue.length;
                 this.uploadedFilesCount = 0;
                 this.uploadedBytes = 0;
                 this.totalBytes = this.queue.reduce((acc, f) => acc + f.size, 0);
                 this.startTime = Date.now();
+                this.progressLog = [{ time: Date.now(), bytes: 0 }];
                 this.isProcessing = true;
+                this.activeRequests = 0;
 
                 const rootName = isFolder ? this.queue[0].webkitRelativePath.split('/')[0] : 'Upload';
                 GlobalUpload.updateProgress(0, 'Starting...', `Preparing ${this.totalFilesCount} files`, rootName);
 
-                // Start workers
+                // Start parallel file workers
                 const workers = [];
-                for (let i = 0; i < this.maxConcurrent; i++) {
+                for (let i = 0; i < this.maxFiles; i++) {
                     workers.push(this.processQueue());
                 }
 
@@ -1130,37 +1147,49 @@
                     } catch (e) {
                         console.error("File upload failed", file.name, e);
                     }
+                    this.updateUI(file.name);
                 }
             },
 
             async uploadFile(file) {
-                const chunkSize = 20 * 1024 * 1024; // 20MB - Aligned with Backend
+                const chunkSize = 10 * 1024 * 1024; // 10MB for better UI responsiveness
                 const totalChunks = Math.ceil(file.size / chunkSize);
                 const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
 
-                // For folders, ensure path exists
+                // Track progress per chunk for real-time aggregation
+                const chunkProgress = new Array(totalChunks).fill(0);
+
                 let targetFolderId = (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null;
                 if (file.webkitRelativePath) {
                     const parts = file.webkitRelativePath.split('/');
-                    parts.pop(); // remove filename
+                    parts.pop();
                     if (parts.length > 0) {
                         targetFolderId = await this.ensureFolder(parts.join('/'), (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null);
                     }
                 }
 
-                // Chunk Loop (Internal concurrency of 3 per file, limited by global maxConcurrent)
                 const chunkIndices = Array.from({ length: totalChunks }, (_, i) => i);
                 const chunkWorkers = [];
-                const maxChunkWorkers = Math.min(3, this.maxConcurrent - this.activeRequests);
 
                 const processChunks = async () => {
                     while (chunkIndices.length > 0) {
                         const idx = chunkIndices.shift();
-                        await this.uploadChunk(file, idx, chunkSize, totalChunks, uploadId);
+                        try {
+                            await this.uploadChunkXHR(file, idx, chunkSize, totalChunks, uploadId, (p) => {
+                                const diff = p - chunkProgress[idx];
+                                chunkProgress[idx] = p;
+                                this.uploadedBytes += diff;
+                                this.logProgress(diff);
+                                this.updateUI(file.name);
+                            });
+                        } catch (e) {
+                            console.error(`Chunk ${idx} failed`, e);
+                            throw e;
+                        }
                     }
                 }
 
-                for (let i = 0; i < 3; i++) chunkWorkers.push(processChunks());
+                for (let i = 0; i < this.chunksPerFile; i++) chunkWorkers.push(processChunks());
                 await Promise.all(chunkWorkers);
 
                 // Finalize
@@ -1175,35 +1204,37 @@
                     headers: { 'X-CSRFToken': csrfToken },
                     body: finishData
                 });
-
-                this.updateUI(file.name);
             },
 
-            async uploadChunk(file, index, chunkSize, totalChunks, uploadId) {
-                const start = index * chunkSize;
-                const end = Math.min(start + chunkSize, file.size);
-                const chunk = file.slice(start, end);
+            uploadChunkXHR(file, index, chunkSize, totalChunks, uploadId, onProgress) {
+                return new Promise((resolve, reject) => {
+                    const start = index * chunkSize;
+                    const end = Math.min(start + chunkSize, file.size);
+                    const chunk = file.slice(start, end);
 
-                const formData = new FormData();
-                formData.append('chunk', chunk);
-                formData.append('upload_id', uploadId);
-                formData.append('chunk_index', index);
-                formData.append('total_chunks', totalChunks);
-                formData.append('filename', file.name);
+                    const formData = new FormData();
+                    formData.append('chunk', chunk);
+                    formData.append('upload_id', uploadId);
+                    formData.append('chunk_index', index);
+                    formData.append('total_chunks', totalChunks);
+                    formData.append('filename', file.name);
 
-                this.activeRequests++;
-                try {
-                    const res = await fetch('/upload_chunk', {
-                        method: 'POST',
-                        headers: { 'X-CSRFToken': csrfToken },
-                        body: formData
-                    });
-                    if (!res.ok) throw new Error("Chunk failed");
-                    this.uploadedBytes += chunk.size;
-                    this.updateUI(file.name);
-                } finally {
-                    this.activeRequests--;
-                }
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/upload_chunk', true);
+                    xhr.setRequestHeader('X-CSRFToken', csrfToken);
+
+                    xhr.upload.onprogress = (e) => {
+                        if (e.lengthComputable) onProgress(e.loaded);
+                    };
+
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) resolve();
+                        else reject(new Error(`Chunk ${index} failed: ${xhr.status}`));
+                    };
+                    xhr.onerror = () => reject(new Error(`Chunk ${index} network error`));
+
+                    xhr.send(formData);
+                });
             },
 
             folderCache: {},
@@ -1211,37 +1242,63 @@
                 if (!path) return parentId;
                 if (this.folderCache[path]) return this.folderCache[path];
 
-                const parts = path.split('/');
-                const folderName = parts.pop();
-                const parentPath = parts.join('/');
-                const resolvedParentId = await this.ensureFolder(parentPath, parentId);
+                // Use a promise queue to prevent multiple calls for same folder
+                if (this.folderCreationQueue[path]) return await this.folderCreationQueue[path];
 
-                const formData = new FormData();
-                formData.append('name', folderName);
-                if (resolvedParentId) formData.append('parent_id', resolvedParentId);
+                this.folderCreationQueue[path] = (async () => {
+                    const parts = path.split('/');
+                    const folderName = parts.pop();
+                    const parentPath = parts.join('/');
+                    const resolvedParentId = await this.ensureFolder(parentPath, parentId);
 
-                const res = await fetch('/create_folder_ajax', {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': csrfToken },
-                    body: formData
-                });
-                const data = await res.json();
-                this.folderCache[path] = data.folder_id;
-                return data.folder_id;
+                    const formData = new FormData();
+                    formData.append('name', folderName);
+                    if (resolvedParentId) formData.append('parent_id', resolvedParentId);
+
+                    const res = await fetch('/create_folder_ajax', {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrfToken },
+                        body: formData
+                    });
+                    const data = await res.json();
+                    this.folderCache[path] = data.folder_id;
+                    delete this.folderCreationQueue[path];
+                    return data.folder_id;
+                })();
+
+                return await this.folderCreationQueue[path];
+            },
+
+            logProgress(bytes) {
+                const now = Date.now();
+                this.progressLog.push({ time: now, bytes: this.uploadedBytes });
+                // Keep only last 5 seconds for calculation
+                const windowMs = 5000;
+                while (this.progressLog.length > 2 && this.progressLog[0].time < now - windowMs) {
+                    this.progressLog.shift();
+                }
             },
 
             updateUI(currentFile) {
-                const elapsed = (Date.now() - this.startTime) / 1000;
-                const speedBps = elapsed > 0 ? this.uploadedBytes / elapsed : 0;
+                if (this.progressLog.length < 2) return;
+
+                const now = Date.now();
+                const oldest = this.progressLog[0];
+                const newest = this.progressLog[this.progressLog.length - 1];
+
+                const timeDiff = (newest.time - oldest.time) / 1000;
+                const bytesDiff = newest.bytes - oldest.bytes;
+
+                const speedBps = timeDiff > 0.1 ? bytesDiff / timeDiff : 0;
                 const speed = speedBps > 1024 * 1024
                     ? (speedBps / 1024 / 1024).toFixed(1) + ' MB/s'
                     : (speedBps / 1024).toFixed(1) + ' KB/s';
 
-                const percent = Math.round((this.uploadedBytes / this.totalBytes) * 100) || 0;
+                const percent = Math.min(99, Math.round((this.uploadedBytes / this.totalBytes) * 100)) || 0;
                 GlobalUpload.updateProgress(
                     percent,
                     speed,
-                    `Uploading ${this.uploadedFilesCount}/${this.totalFilesCount}`,
+                    `Uploading ${this.uploadedFilesCount + 1}/${this.totalFilesCount}`,
                     currentFile
                 );
             },

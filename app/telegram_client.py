@@ -346,11 +346,31 @@ class BotClient:
             return await self.client.download_media(msg, in_memory=False)
         
         async def work():
-            # Process in batches to limit concurrent downloads
             results = []
             for i in range(0, len(message_ids), max_concurrent):
                 batch = message_ids[i:i + max_concurrent]
                 batch_results = await asyncio.gather(*[download_single(mid) for mid in batch])
+                results.extend(batch_results)
+            return results
+            
+        return self._run_async(work())
+
+    def upload_chunks_parallel(self, chunk_paths, max_concurrent=3):
+        """Upload multiple chunks in parallel to Telegram."""
+        target = self.channel_id
+        
+        async def upload_single(cp):
+            return await self.client.send_document(
+                target,
+                document=cp,
+                file_name=os.path.basename(cp)
+            )
+        
+        async def work():
+            results = []
+            for i in range(0, len(chunk_paths), max_concurrent):
+                batch = chunk_paths[i:i + max_concurrent]
+                batch_results = await asyncio.gather(*[upload_single(cp) for cp in batch])
                 results.extend(batch_results)
             return results
             

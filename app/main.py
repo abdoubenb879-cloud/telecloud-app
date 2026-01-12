@@ -215,8 +215,25 @@ def internal_error(error):
                            message="Something went wrong on our end.",
                            error_code="500"), 500
 
+@app.context_processor
+def utility_processor():
+    def getFileIcon(filename):
+        if not filename: return 'fa-file'
+        ext = filename.split('.')[-1].lower()
+        icons = {
+            'pdf': 'fa-file-pdf',
+            'doc': 'fa-file-word', 'docx': 'fa-file-word',
+            'xls': 'fa-file-excel', 'xlsx': 'fa-file-excel',
+            'jpg': 'fa-file-image', 'jpeg': 'fa-file-image', 'png': 'fa-file-image', 'gif': 'fa-file-image',
+            'mp4': 'fa-file-video', 'mkv': 'fa-file-video', 'mov': 'fa-file-video', 'webm': 'fa-file-video',
+            'mp3': 'fa-file-audio', 'wav': 'fa-file-audio', 'ogg': 'fa-file-audio', 'm4a': 'fa-file-audio',
+            'zip': 'fa-file-archive', 'rar': 'fa-file-archive', '7z': 'fa-file-archive', 'tar': 'fa-file-archive'
+        }
+        return icons.get(ext, 'fa-file')
+    return dict(getFileIcon=getFileIcon)
+
 # Health check endpoint for Render
-@app.route('/health')
+@app.route('/health_check')
 def health_check():
     """Health check endpoint for deployment monitoring."""
     return jsonify({"status": "healthy", "service": "cloudvault"}), 200

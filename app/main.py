@@ -1113,6 +1113,64 @@ def download_file(file_id=None, token=None):
             if Config.MULTI_USER:
                 file_id = info['id']
                 filename = info['filename']
+                is_folder = info.get('is_folder', False)
+                
+                # Handle folder downloads - create ZIP
+                if is_folder:
+                    import zipfile
+                    print(f"[SHARE] Folder download requested: {filename} (ID: {file_id})")
+                    
+                    def get_files_recursive(parent_id, path=""):
+                        files_list = []
+                        items = db.list_files_by_parent(parent_id)
+                        for item in items:
+                            i_id = item['id']
+                            i_name = item['filename']
+                            i_folder = item['is_folder']
+                            if i_folder:
+                                subpath = f"{path}/{i_name}" if path else i_name
+                                files_list.extend(get_files_recursive(i_id, subpath))
+                            else:
+                                files_list.append({
+                                    'id': i_id,
+                                    'name': i_name,
+                                    'path': f"{path}/{i_name}" if path else i_name
+                                })
+                        return files_list
+                    
+                    files = get_files_recursive(file_id)
+                    print(f"[SHARE] Found {len(files)} files in folder")
+                    if not files:
+                        return "Folder is empty", 400
+                    
+                    zip_buffer = BytesIO()
+                    bot = get_bot_client()
+                    bot.connect()
+                    
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_STORED) as zip_file:
+                        for f_info in files:
+                            try:
+                                chunks = db.get_chunks(f_info['id'])
+                                if not chunks: continue
+                                cdat = BytesIO()
+                                for chunk in chunks:
+                                    mid = chunk['message_id']
+                                    cp = bot.download_media(mid)
+                                    if cp and os.path.exists(cp):
+                                        with open(cp, 'rb') as f:
+                                            cdat.write(f.read())
+                                        os.remove(cp)
+                                cdat.seek(0)
+                                zip_file.writestr(f_info['path'], cdat.read())
+                                print(f"[SHARE] Added to ZIP: {f_info['path']}")
+                            except Exception as e:
+                                print(f"[SHARE] Error adding {f_info['name']}: {e}")
+                                continue
+                    
+                    zip_buffer.seek(0)
+                    print(f"[SHARE] ZIP size: {zip_buffer.getbuffer().nbytes} bytes")
+                    return send_file(zip_buffer, mimetype='application/zip', as_attachment=True, download_name=f"{filename}.zip")
+                
                 chunks = db.get_chunks(file_id)
             else:
                 file_id = info[0]

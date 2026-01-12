@@ -1307,7 +1307,7 @@
                 this.isProcessing = false;
                 GlobalUpload.updateProgress(100, 'Done', 'Syncing Folder...', rootName);
                 Modal.countdown('Transfer Complete!', `Successfully processed ${this.totalFilesCount} files.`, 5, () => {
-                    if (window.location.pathname === '/') refreshFileGrid();
+                    window.location.reload();
                 });
             }
         };

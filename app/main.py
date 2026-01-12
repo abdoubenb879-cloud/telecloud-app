@@ -331,10 +331,8 @@ def create_folder_ajax():
         return jsonify({"error": "Folder name required"}), 400
     
     try:
-        if Config.MULTI_USER:
-            folder_id = db.create_folder(session['user_id'], name, parent_id)
-        else:
-            folder_id = db.create_folder(name, parent_id)
+        user_id = session.get('user_id') if Config.MULTI_USER else 'default_user'
+        folder_id = db.get_or_create_folder(user_id, name, parent_id)
         
         return jsonify({"status": "ok", "folder_id": folder_id})
     except Exception as e:

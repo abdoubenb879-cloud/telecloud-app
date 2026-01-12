@@ -127,6 +127,27 @@ class CloudDatabase:
         result = self._request("files", method="POST", data=data)
         return result[0]['id'] if result else None
 
+    def get_or_create_folder(self, user_id, name, parent_id=None):
+        """Finds an existing folder or creates a new one (Idempotent)."""
+        # Search for existing folder
+        params = {
+            "user_id": f"eq.{user_id}",
+            "filename": f"eq.{name}",
+            "is_folder": "is.true",
+            "is_deleted": "is.false"
+        }
+        if parent_id:
+            params["parent_id"] = f"eq.{parent_id}"
+        else:
+            params["parent_id"] = "is.null"
+
+        existing = self._request("files", method="GET", params=params)
+        if existing:
+            return existing[0]['id']
+
+        # Not found, create it
+        return self.create_folder(user_id, name, parent_id)
+
     def add_chunk(self, file_id, chunk_index, message_id, chunk_size):
         """Tracks individual chunks for a file."""
         data = {

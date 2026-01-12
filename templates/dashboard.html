@@ -1084,287 +1084,188 @@
             }
         });
 
-        function handleFileSelect(event) {
-            if (event.target.files.length) {
-                handleFiles(event.target.files);
-            }
-        }
+        // ============================================================================
+        // LIGHTNING UPLOAD SYSTEM (Unified High-Speed Queue)
+        // ============================================================================
+        const UploadManager = {
+            queue: [],
+            activeRequests: 0,
+            maxConcurrent: 8,
+            uploadedBytes: 0,
+            totalBytes: 0,
+            startTime: null,
+            timer: null,
+            isProcessing: false,
+            uploadedFilesCount: 0,
+            totalFilesCount: 0,
 
-        // Folder upload handler
-        async function handleFolderSelect(event) {
-            const files = Array.from(event.target.files);
-            if (!files.length) return;
+            async init(files, isFolder = false) {
+                this.queue = Array.from(files);
+                this.totalFilesCount = this.queue.length;
+                this.uploadedFilesCount = 0;
+                this.uploadedBytes = 0;
+                this.totalBytes = this.queue.reduce((acc, f) => acc + f.size, 0);
+                this.startTime = Date.now();
+                this.isProcessing = true;
 
-            const progressContainer = document.getElementById('uploadProgress');
-            const progressFill = document.getElementById('progressFill');
-            const uploadPercent = document.getElementById('uploadPercent');
-            const uploadStatus = document.getElementById('uploadStatus');
-            const uploadFileName = document.getElementById('uploadFileName');
+                const rootName = isFolder ? this.queue[0].webkitRelativePath.split('/')[0] : 'Upload';
+                GlobalUpload.updateProgress(0, 'Starting...', `Preparing ${this.totalFilesCount} files`, rootName);
 
-            progressContainer.classList.add('hidden'); // Use global instead
-            GlobalUpload.activeThreads++;
+                // Start workers
+                const workers = [];
+                for (let i = 0; i < this.maxConcurrent; i++) {
+                    workers.push(this.processQueue());
+                }
 
-            // Get the root folder name from the first file's path
-            const rootFolderName = files[0].webkitRelativePath.split('/')[0];
-            uploadStatus.textContent = `Uploading folder: ${rootFolderName}`;
+                await Promise.all(workers);
+                this.finish(rootName);
+            },
 
-            // Build folder structure from file paths
-            const folderCache = {}; // path -> folder_id
-            const baseFolderId = (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null;
+            async processQueue() {
+                while (this.queue.length > 0) {
+                    const file = this.queue.shift();
+                    try {
+                        await this.uploadFile(file);
+                        this.uploadedFilesCount++;
+                    } catch (e) {
+                        console.error("File upload failed", file.name, e);
+                    }
+                }
+            },
 
-            // Create folder recursively and return its ID
-            async function ensureFolder(folderPath) {
-                if (!folderPath) return baseFolderId;
-                if (folderCache[folderPath]) return folderCache[folderPath];
+            async uploadFile(file) {
+                const chunkSize = 20 * 1024 * 1024; // 20MB - Aligned with Backend
+                const totalChunks = Math.ceil(file.size / chunkSize);
+                const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
 
-                const parts = folderPath.split('/');
-                const folderName = parts.pop();
-                const parentPath = parts.join('/');
+                // For folders, ensure path exists
+                let targetFolderId = (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null;
+                if (file.webkitRelativePath) {
+                    const parts = file.webkitRelativePath.split('/');
+                    parts.pop(); // remove filename
+                    if (parts.length > 0) {
+                        targetFolderId = await this.ensureFolder(parts.join('/'), (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null);
+                    }
+                }
 
-                // Ensure parent exists first
-                const parentId = await ensureFolder(parentPath);
+                // Chunk Loop (Internal concurrency of 3 per file, limited by global maxConcurrent)
+                const chunkIndices = Array.from({ length: totalChunks }, (_, i) => i);
+                const chunkWorkers = [];
+                const maxChunkWorkers = Math.min(3, this.maxConcurrent - this.activeRequests);
 
-                // Create this folder
+                const processChunks = async () => {
+                    while (chunkIndices.length > 0) {
+                        const idx = chunkIndices.shift();
+                        await this.uploadChunk(file, idx, chunkSize, totalChunks, uploadId);
+                    }
+                }
+
+                for (let i = 0; i < 3; i++) chunkWorkers.push(processChunks());
+                await Promise.all(chunkWorkers);
+
+                // Finalize
+                const finishData = new FormData();
+                finishData.append('upload_id', uploadId);
+                finishData.append('filename', file.name);
+                finishData.append('total_chunks', totalChunks);
+                if (targetFolderId) finishData.append('parent_id', targetFolderId);
+
+                await fetch('/upload_finish', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken },
+                    body: finishData
+                });
+
+                this.updateUI(file.name);
+            },
+
+            async uploadChunk(file, index, chunkSize, totalChunks, uploadId) {
+                const start = index * chunkSize;
+                const end = Math.min(start + chunkSize, file.size);
+                const chunk = file.slice(start, end);
+
                 const formData = new FormData();
-                formData.append('name', folderName);
-                if (parentId) formData.append('parent_id', parentId);
+                formData.append('chunk', chunk);
+                formData.append('upload_id', uploadId);
+                formData.append('chunk_index', index);
+                formData.append('total_chunks', totalChunks);
+                formData.append('filename', file.name);
 
+                this.activeRequests++;
                 try {
-                    const response = await fetch('/create_folder_ajax', {
+                    const res = await fetch('/upload_chunk', {
                         method: 'POST',
                         headers: { 'X-CSRFToken': csrfToken },
                         body: formData
                     });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        folderCache[folderPath] = data.folder_id;
-                        return data.folder_id;
-                    }
-                } catch (e) {
-                    console.error('Failed to create folder:', folderPath, e);
+                    if (!res.ok) throw new Error("Chunk failed");
+                    this.uploadedBytes += chunk.size;
+                    this.updateUI(file.name);
+                } finally {
+                    this.activeRequests--;
                 }
+            },
 
-                return parentId; // Fallback to parent if folder creation fails
-            }
+            folderCache: {},
+            async ensureFolder(path, parentId) {
+                if (!path) return parentId;
+                if (this.folderCache[path]) return this.folderCache[path];
 
-            // Upload files one by one
-            const totalFiles = files.length;
-            let uploadedCount = 0;
-            let failedCount = 0;
-            const maxSize = 2000 * 1024 * 1024; // 2GB
+                const parts = path.split('/');
+                const folderName = parts.pop();
+                const parentPath = parts.join('/');
+                const resolvedParentId = await this.ensureFolder(parentPath, parentId);
 
-            for (const file of files) {
-                const relativePath = file.webkitRelativePath;
-                const pathParts = relativePath.split('/');
-                pathParts.pop(); // Remove filename
-                const folderPath = pathParts.join('/');
+                const formData = new FormData();
+                formData.append('name', folderName);
+                if (resolvedParentId) formData.append('parent_id', resolvedParentId);
 
-                uploadFileName.textContent = relativePath;
-                uploadStatus.textContent = `Uploading (${uploadedCount + 1}/${totalFiles})`;
+                const res = await fetch('/create_folder_ajax', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken },
+                    body: formData
+                });
+                const data = await res.json();
+                this.folderCache[path] = data.folder_id;
+                return data.folder_id;
+            },
 
-                // Skip files that are too large
-                if (file.size > maxSize) {
-                    console.warn(`Skipping ${file.name} - too large`);
-                    failedCount++;
-                    uploadedCount++;
-                    continue;
-                }
+            updateUI(currentFile) {
+                const elapsed = (Date.now() - this.startTime) / 1000;
+                const speedBps = elapsed > 0 ? this.uploadedBytes / elapsed : 0;
+                const speed = speedBps > 1024 * 1024
+                    ? (speedBps / 1024 / 1024).toFixed(1) + ' MB/s'
+                    : (speedBps / 1024).toFixed(1) + ' KB/s';
 
-                // Skip empty files (directories often show as 0-byte files)
-                if (file.size === 0) {
-                    uploadedCount++;
-                    const overallPercent = Math.round((uploadedCount / totalFiles) * 100);
-                    GlobalUpload.updateProgress(overallPercent, 'Skipping', 'Processing folder structure...', file.name);
-                    continue;
-                }
+                const percent = Math.round((this.uploadedBytes / this.totalBytes) * 100) || 0;
+                GlobalUpload.updateProgress(
+                    percent,
+                    speed,
+                    `Uploading ${this.uploadedFilesCount}/${this.totalFilesCount}`,
+                    currentFile
+                );
+            },
 
-                // Ensure folder exists
-                const targetFolderId = await ensureFolder(folderPath);
-
-                // Chunked upload
-                const chunkSize = 10 * 1024 * 1024;
-                const totalChunks = Math.ceil(file.size / chunkSize);
-                const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-
-                let uploadSuccess = true;
-
-                for (let i = 0; i < totalChunks; i++) {
-                    const start = i * chunkSize;
-                    const end = Math.min(start + chunkSize, file.size);
-                    const chunk = file.slice(start, end);
-
-                    const formData = new FormData();
-                    formData.append('chunk', chunk);
-                    formData.append('upload_id', uploadId);
-                    formData.append('chunk_index', i);
-                    formData.append('total_chunks', totalChunks);
-                    formData.append('filename', file.name);
-
-                    try {
-                        const chunkStart = Date.now();
-                        const response = await fetch('/upload_chunk', {
-                            method: 'POST',
-                            headers: { 'X-CSRFToken': csrfToken },
-                            body: formData
-                        });
-                        if (!response.ok) throw new Error('Chunk failed');
-
-                        const chunkTime = (Date.now() - chunkStart) / 1000;
-                        const rate = chunkTime > 0 ? (chunk.size / 1024 / chunkTime).toFixed(1) : '...';
-                        const overallPercent = Math.round(((uploadedCount * 10 + i + 1) / (totalFiles * 10)) * 100); // Simplified ratio
-
-                        GlobalUpload.updateProgress(
-                            overallPercent,
-                            `${rate} KB/s`,
-                            `Folder Upload: ${uploadedCount + 1}/${totalFiles}`,
-                            file.name
-                        );
-                    } catch (e) {
-                        console.error(`Failed to upload chunk for ${file.name}:`, e);
-                        uploadSuccess = false;
-                        failedCount++;
-                        break;
-                    }
-                }
-
-                if (uploadSuccess) {
-                    // Finalize upload
-                    const finishData = new FormData();
-                    finishData.append('upload_id', uploadId);
-                    finishData.append('filename', file.name);
-                    if (targetFolderId) finishData.append('parent_id', targetFolderId);
-
-                    try {
-                        await fetch('/upload_finish', {
-                            method: 'POST',
-                            headers: { 'X-CSRFToken': csrfToken },
-                            body: finishData
-                        });
-                    } catch (e) {
-                        console.error(`Failed to finalize ${file.name}:`, e);
-                        failedCount++;
-                    }
-                }
-
-                uploadedCount++;
-                const overallPercent = Math.round((uploadedCount / totalFiles) * 100);
-                GlobalUpload.updateProgress(overallPercent, 'Next file', `Completed ${uploadedCount}/${totalFiles}`, file.name);
-            }
-
-            progressContainer.classList.add('hidden');
-
-            if (failedCount > 0) {
-                await Modal.alert('Upload Complete', `Uploaded ${totalFiles - failedCount} of ${totalFiles} files. ${failedCount} files failed.`);
-            } else {
-                GlobalUpload.updateProgress(100, 'Done', 'Syncing Folder...', rootFolderName);
-                Modal.countdown('Transfer Complete!', `All ${totalFiles} files are being synced to the cloud. They will appear shortly.`, 5, () => {
+            finish(rootName) {
+                this.isProcessing = false;
+                GlobalUpload.updateProgress(100, 'Done', 'Syncing Folder...', rootName);
+                Modal.countdown('Transfer Complete!', `Successfully processed ${this.totalFilesCount} files.`, 5, () => {
                     if (window.location.pathname === '/') refreshFileGrid();
                 });
             }
+        };
 
-            // Reset the input so the same folder can be selected again
-            event.target.value = '';
+        function handleFileSelect(event) {
+            if (event.target.files.length) UploadManager.init(event.target.files, false);
         }
 
+        async function handleFolderSelect(event) {
+            if (event.target.files.length) UploadManager.init(event.target.files, true);
+        }
+
+        // Keep handleFiles for drag and drop compatibility
         async function handleFiles(files) {
-            GlobalUpload.activeThreads++;
-            const totalFiles = files.length;
-            let uploadedCount = 0;
-
-            for (const file of files) {
-                const filename = file.name;
-                const maxSize = 2000 * 1024 * 1024; // 2GB
-
-                if (file.size > maxSize) {
-                    await Modal.alert('Upload Error', `File ${file.name} too large. Max size: 2GB`);
-                    continue;
-                }
-
-                const chunkSize = 10 * 1024 * 1024; // 10MB chunks
-                const totalChunks = Math.ceil(file.size / chunkSize);
-                const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-
-                GlobalUpload.updateProgress(0, 'Preparing...', `Uploading 1/${totalFiles}`, filename);
-
-                // Parallel Upload Logic: 3 concurrent chunks
-                const chunkQueue = Array.from({ length: totalChunks }, (_, i) => i);
-                let completedChunks = 0;
-                let failed = false;
-
-                const uploadWorker = async () => {
-                    while (chunkQueue.length > 0 && !failed) {
-                        const i = chunkQueue.shift();
-                        const start = i * chunkSize;
-                        const end = Math.min(start + chunkSize, file.size);
-                        const chunk = file.slice(start, end);
-
-                        const formData = new FormData();
-                        formData.append('chunk', chunk);
-                        formData.append('upload_id', uploadId);
-                        formData.append('chunk_index', i);
-                        formData.append('total_chunks', totalChunks);
-                        formData.append('filename', file.name);
-
-                        try {
-                            const res = await fetch('/upload_chunk', {
-                                method: 'POST',
-                                headers: { 'X-CSRFToken': csrfToken },
-                                body: formData
-                            });
-
-                            if (!res.ok) throw new Error('Chunk failed');
-
-                            completedChunks++;
-                            const chunkPercent = Math.round((completedChunks / totalChunks) * 100);
-                            const overallPercent = Math.round(((uploadedCount / totalFiles) * 100) + (chunkPercent / totalFiles));
-
-                            GlobalUpload.updateProgress(
-                                overallPercent,
-                                `Chunk ${completedChunks}/${totalChunks}`,
-                                `File ${uploadedCount + 1}/${totalFiles}`,
-                                filename
-                            );
-                        } catch (e) {
-                            console.error(`Upload error on chunk ${i}:`, e);
-                            failed = true;
-                        }
-                    }
-                };
-
-                // Run 3 workers in parallel
-                await Promise.all([uploadWorker(), uploadWorker(), uploadWorker()]);
-
-                if (failed) {
-                    await Modal.alert('Upload Failed', `Could not upload ${filename}. Please check your connection.`);
-                    continue;
-                }
-
-                // Finalize upload
-                const finishData = new FormData();
-                finishData.append('upload_id', uploadId);
-                finishData.append('filename', filename);
-                finishData.append('total_chunks', totalChunks); // NEW: Send total chunks for server merge
-                const folderId = (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null;
-                if (folderId) finishData.append('parent_id', folderId);
-
-                try {
-                    const res = await fetch('/upload_finish', {
-                        method: 'POST',
-                        headers: { 'X-CSRFToken': csrfToken },
-                        body: finishData
-                    });
-                    if (!res.ok) throw new Error('Finalize failed');
-                    uploadedCount++;
-                } catch (e) {
-                    await Modal.alert('Error', 'Failed to finalize upload');
-                }
-            }
-
-            GlobalUpload.updateProgress(100, 'Done', 'Syncing with Cloud...', 'Finished');
-            Modal.countdown('Upload Complete!', 'Your files were uploaded at high speed and are now syncing.', 5, () => {
-                if (window.location.pathname === '/') refreshFileGrid();
-            });
+            UploadManager.init(files, false);
         }
 
         // Hide loading on page load

@@ -160,6 +160,17 @@ class CloudDatabase:
         result = self._request("files", params=params)
         return result if result else []
 
+    def list_files_by_parent(self, parent_id):
+        """Lists files by parent folder ID only (for shared folder downloads)."""
+        params = {
+            "parent_id": f"eq.{parent_id}", 
+            "or": "(is_deleted.is.null,is_deleted.eq.false)",
+            "select": "*", 
+            "order": "is_folder.desc,created_at.desc"
+        }
+        result = self._request("files", params=params)
+        return result if result else []
+
     def get_file(self, file_id):
         """Retrieves file metadata by ID."""
         result = self._request("files", params={"id": f"eq.{file_id}", "select": "*"})

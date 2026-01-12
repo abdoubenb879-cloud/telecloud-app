@@ -151,7 +151,7 @@ const Modal = {
         const modalId = 'modal-' + Date.now();
         const modalHtml = `
             <div class="modal-overlay active" id="${modalId}" style="z-index: 10000;">
-                <div class="modal-content animate-scale-up text-center" style="max-width: 380px; overflow: hidden; position: relative;">
+                <div class="modal-content animate-scale-up" style="max-width: 360px; overflow: hidden; position: relative; text-align: center; padding: 32px 24px;">
                     <!-- Celebration particles -->
                     <div class="celebration-particles" id="particles-${modalId}">
                         ${Array(12).fill().map((_, i) => `
@@ -160,24 +160,26 @@ const Modal = {
                     </div>
                     
                     <!-- Animated checkmark -->
-                    <div class="modal-success-icon mb-4">
-                        <svg class="m-checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+                    <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+                        <svg class="m-checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" style="width: 64px; height: 64px;">
                             <circle class="m-checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
                             <path class="m-checkmark-check" fill="none" d="m14.1 27.2l7.1 7.2 16.7-16.8"/>
                         </svg>
                     </div>
                     
-                    <h3 class="modal-title mb-2" style="font-size: 1.4rem;">${title}</h3>
-                    <p class="text-secondary mb-4" style="font-size: 1rem;">${message}</p>
+                    <h3 class="modal-title" style="font-size: 1.35rem; margin-bottom: 8px;">${title}</h3>
+                    <p class="text-secondary" style="font-size: 0.95rem; margin-bottom: 20px; line-height: 1.5;">${message}</p>
                     
                     <!-- Countdown ring -->
-                    <div class="countdown-ring mb-4" id="ring-${modalId}">
-                        <svg width="80" height="80" viewBox="0 0 80 80">
-                            <circle class="countdown-bg" cx="40" cy="40" r="36" fill="none" stroke="var(--border)" stroke-width="4"/>
-                            <circle class="countdown-progress" cx="40" cy="40" r="36" fill="none" stroke="var(--success)" stroke-width="4" 
-                                stroke-dasharray="226.2" stroke-dashoffset="0" style="transition: stroke-dashoffset 1s linear;"/>
-                        </svg>
-                        <span class="countdown-number" id="counter-${modalId}">${seconds}</span>
+                    <div style="display: flex; justify-content: center; margin-bottom: 16px;">
+                        <div class="countdown-ring" id="ring-${modalId}" style="position: relative; width: 72px; height: 72px;">
+                            <svg width="72" height="72" viewBox="0 0 72 72">
+                                <circle class="countdown-bg" cx="36" cy="36" r="32" fill="none" stroke="var(--border)" stroke-width="4"/>
+                                <circle class="countdown-progress" cx="36" cy="36" r="32" fill="none" stroke="var(--success)" stroke-width="4" 
+                                    stroke-dasharray="201" stroke-dashoffset="0" style="transition: stroke-dashoffset 1s linear; transform: rotate(-90deg); transform-origin: center;"/>
+                            </svg>
+                            <span class="countdown-number" id="counter-${modalId}" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5rem; font-weight: 600;">${seconds}</span>
+                        </div>
                     </div>
                     
                     <button class="btn btn-ghost text-muted" id="skip-${modalId}" style="font-size: 0.85rem;">
@@ -193,7 +195,7 @@ const Modal = {
         const counterEl = document.getElementById(`counter-${modalId}`);
         const progressCircle = modal.querySelector('.countdown-progress');
         const skipBtn = document.getElementById(`skip-${modalId}`);
-        const circumference = 226.2;
+        const circumference = 201; // 2 * PI * 32 (radius)
 
         let remaining = seconds;
         let interval;

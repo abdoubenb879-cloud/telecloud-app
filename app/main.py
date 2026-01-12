@@ -1474,8 +1474,9 @@ def download_shared(token):
             
             def get_files_recursive(parent_id, path=""):
                 files_list = []
-                print(f"[SHARE] Listing files in folder {parent_id}, user={user_id}")
-                items = db.list_files(user_id, parent_id)
+                print(f"[SHARE] Listing files in folder {parent_id}")
+                # Use list_files_by_parent which doesn't require user_id
+                items = db.list_files_by_parent(parent_id)
                 print(f"[SHARE] Found {len(items) if items else 0} items in folder {parent_id}")
                 for item in items:
                     i_id = item['id']

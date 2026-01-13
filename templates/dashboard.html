@@ -5,11 +5,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CloudVault - Secure Cloud Storage</title>
+    <title>Khaznati - خزنتي | Secure Cloud Storage</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ range(1, 10000) | random }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='rtl.css') }}?v=1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#6366f1">
@@ -24,9 +27,9 @@
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="CloudVault" class="sidebar-logo"
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Khaznati" class="sidebar-logo"
                     style="width: 40px; height: 40px;">
-                <span class="sidebar-brand">CloudVault</span>
+                <span class="sidebar-brand brand-name">Khaznati</span>
             </div>
 
             <nav class="sidebar-nav">
@@ -34,11 +37,11 @@
                     <div class="nav-section-title">Storage</div>
                     <a href="/" class="nav-item active">
                         <i class="fas fa-folder"></i>
-                        <span>My Files</span>
+                        <span data-i18n="dashboard.my_files">My Files</span>
                     </a>
                     <a href="/trash" class="nav-item">
                         <i class="fas fa-trash-alt"></i>
-                        <span>Trash</span>
+                        <span data-i18n="trash.title">Trash</span>
                     </a>
                 </div>
 
@@ -46,7 +49,7 @@
                     <div class="nav-section-title">Account</div>
                     <a href="/settings" class="nav-item">
                         <i class="fas fa-cog"></i>
-                        <span>Settings</span>
+                        <span data-i18n="settings.title">Settings</span>
                     </a>
                 </div>
             </nav>
@@ -1334,6 +1337,8 @@
         }
     </script>
     {% endif %}
+    <!-- Language Switcher -->
+    <script src="{{ url_for('static', filename='i18n.js') }}?v=1"></script>
 </body>
 
 </html>

@@ -1,0 +1,276 @@
+/* ================================================
+   Khaznati (خزنتي) - RTL & Language Support
+   Arabic/Right-to-Left Styles
+   ================================================ */
+
+/* Language Switcher Button */
+.lang-switcher {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    padding: 8px 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    backdrop-filter: blur(10px);
+}
+
+.lang-switcher:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--primary);
+    transform: scale(1.05);
+}
+
+/* RTL body class */
+body.rtl .lang-switcher {
+    right: auto;
+    left: 20px;
+}
+
+/* ============= RTL Layout Overrides ============= */
+
+/* Sidebar */
+body.rtl .sidebar {
+    left: auto;
+    right: 0;
+    border-right: none;
+    border-left: 1px solid var(--border);
+}
+
+body.rtl .main-content {
+    margin-left: 0;
+    margin-right: var(--sidebar-width);
+}
+
+body.rtl .main-content.sidebar-collapsed {
+    margin-right: var(--sidebar-collapsed);
+}
+
+/* Text alignment */
+body.rtl {
+    text-align: right;
+}
+
+body.rtl .text-left {
+    text-align: right;
+}
+
+body.rtl .text-right {
+    text-align: left;
+}
+
+/* Flexbox direction */
+body.rtl .flex-row,
+body.rtl .d-flex,
+body.rtl .file-row,
+body.rtl .nav-links,
+body.rtl .breadcrumb,
+body.rtl .action-buttons {
+    flex-direction: row-reverse;
+}
+
+/* Margins and Paddings */
+body.rtl .ml-1, body.rtl .ml-2, body.rtl .ml-3, body.rtl .ml-4 {
+    margin-left: 0;
+    margin-right: var(--space-2);
+}
+
+body.rtl .mr-1, body.rtl .mr-2, body.rtl .mr-3, body.rtl .mr-4 {
+    margin-right: 0;
+    margin-left: var(--space-2);
+}
+
+body.rtl .pl-1, body.rtl .pl-2, body.rtl .pl-3, body.rtl .pl-4 {
+    padding-left: 0;
+    padding-right: var(--space-2);
+}
+
+body.rtl .pr-1, body.rtl .pr-2, body.rtl .pr-3, body.rtl .pr-4 {
+    padding-right: 0;
+    padding-left: var(--space-2);
+}
+
+/* Icons */
+body.rtl .icon-left {
+    margin-left: 8px;
+    margin-right: 0;
+}
+
+body.rtl .icon-right {
+    margin-right: 8px;
+    margin-left: 0;
+}
+
+/* File list items */
+body.rtl .file-item {
+    padding-left: var(--space-4);
+    padding-right: var(--space-6);
+}
+
+body.rtl .file-checkbox {
+    margin-right: 0;
+    margin-left: var(--space-3);
+}
+
+body.rtl .file-icon {
+    margin-right: 0;
+    margin-left: var(--space-3);
+}
+
+/* Dropdowns */
+body.rtl .dropdown-menu {
+    left: auto;
+    right: 0;
+}
+
+body.rtl .dropdown-menu-right {
+    left: 0;
+    right: auto;
+}
+
+/* Modals */
+body.rtl .modal-header,
+body.rtl .modal-footer {
+    flex-direction: row-reverse;
+}
+
+body.rtl .modal-close {
+    left: 20px;
+    right: auto;
+}
+
+/* Form inputs */
+body.rtl input,
+body.rtl textarea,
+body.rtl select {
+    text-align: right;
+}
+
+body.rtl input[type="email"],
+body.rtl input[type="number"] {
+    text-align: left; /* Keep LTR for emails and numbers */
+    direction: ltr;
+}
+
+/* Breadcrumb separator */
+body.rtl .breadcrumb-separator {
+    transform: scaleX(-1);
+}
+
+/* Navigation arrows */
+body.rtl .nav-arrow-left {
+    transform: scaleX(-1);
+}
+
+body.rtl .nav-arrow-right {
+    transform: scaleX(-1);
+}
+
+/* Progress bars */
+body.rtl .progress-fill {
+    transform-origin: right;
+}
+
+/* Search icon */
+body.rtl .search-input-wrapper .search-icon {
+    left: auto;
+    right: var(--space-3);
+}
+
+body.rtl .search-input-wrapper input {
+    padding-left: var(--space-4);
+    padding-right: 40px;
+}
+
+/* Folder tree indentation */
+body.rtl .folder-tree-item {
+    padding-left: 0;
+    padding-right: calc(var(--depth) * 20px);
+}
+
+/* Checkbox alignment */
+body.rtl .checkbox-wrapper {
+    flex-direction: row-reverse;
+}
+
+body.rtl .checkbox-wrapper label {
+    margin-left: 0;
+    margin-right: var(--space-2);
+}
+
+/* Toast notifications */
+body.rtl .toast {
+    right: auto;
+    left: 20px;
+}
+
+/* Tables */
+body.rtl table {
+    direction: rtl;
+}
+
+body.rtl th,
+body.rtl td {
+    text-align: right;
+}
+
+/* Context menu */
+body.rtl .context-menu {
+    direction: rtl;
+}
+
+/* Arabic Font Stack */
+body.rtl {
+    font-family: 'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+}
+
+/* Specific component RTL fixes */
+body.rtl .stat-card-icon {
+    margin-right: 0;
+    margin-left: var(--space-4);
+}
+
+body.rtl .file-meta {
+    flex-direction: row-reverse;
+}
+
+body.rtl .upload-area {
+    direction: rtl;
+}
+
+/* Mobile RTL */
+@media (max-width: 768px) {
+    body.rtl .mobile-menu {
+        left: auto;
+        right: 0;
+    }
+    
+    body.rtl .mobile-menu-toggle {
+        left: auto;
+        right: var(--space-4);
+    }
+    
+    body.rtl .lang-switcher {
+        top: auto;
+        bottom: 80px;
+        right: 20px;
+        left: auto;
+    }
+    
+    body.rtl .main-content {
+        margin-right: 0;
+    }
+}
+
+/* Print RTL */
+@media print {
+    body.rtl {
+        direction: rtl;
+    }
+}

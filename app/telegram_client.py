@@ -287,13 +287,14 @@ class BotClient:
                 # Recreate the Pyrogram client instance for the new loop
                 self.client = Client(
                     "telecloud_bot",
-                    api_id=Config.TELEGRAM_API_ID,
-                    api_hash=Config.TELEGRAM_API_HASH,
+                    api_id=Config.API_ID,
+                    api_hash=Config.API_HASH,
                     bot_token=Config.BOT_TOKEN,
                     in_memory=True,
                     no_updates=True
                 )
                 print("[BOT] New client instance created, will reconnect on demand", flush=True)
+
         
         # Check if loop is actually running
         if _loop is None:

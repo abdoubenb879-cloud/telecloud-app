@@ -295,7 +295,15 @@ class BotClient:
                     in_memory=True,
                     no_updates=True
                 )
-                print("[BOT] New client instance created, will reconnect on demand", flush=True)
+                print("[BOT] New client instance created, starting it...", flush=True)
+                # Start the client NOW so it's fully connected
+                async def start_client():
+                    await self.client.start()
+                future = asyncio.run_coroutine_threadsafe(start_client(), _loop)
+                future.result(timeout=60)  # Wait up to 60s for connect
+                self._connected = True
+                print(f"[BOT] New client connected to channel {self.channel_id}", flush=True)
+
 
 
         

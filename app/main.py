@@ -38,6 +38,7 @@ from flask_compress import Compress
 from app.config import Config
 from app.chunker import Chunker
 from app.telegram_client import TelegramCloud, get_bot_client
+from app.upload_queue import get_upload_queue, UploadStatus
 import hashlib
 
 # Pluggable Database Logic
@@ -236,7 +237,13 @@ def utility_processor():
 @app.route('/health_check')
 def health_check():
     """Health check endpoint for deployment monitoring."""
-    return jsonify({"status": "healthy", "service": "cloudvault"}), 200
+    queue = get_upload_queue()
+    return jsonify({
+        "status": "healthy", 
+        "service": "cloudvault",
+        "queue": queue.stats
+    }), 200
+
 
 @app.route('/debug-user-v3')
 def debug_user_lookup():
@@ -1020,18 +1027,35 @@ def upload_finish():
                 os.remove(part_path)
         
         file_size = os.path.getsize(final_temp_path)
-        max_size = 2000 * 1024 * 1024 # 2GB
         
-        if file_size > max_size:
+        # Get queue for size validation and concurrency tracking
+        queue = get_upload_queue()
+        is_valid, error_msg = queue.validate_upload(file_size, user_id)
+        
+        if not is_valid:
             os.remove(final_temp_path)
-            return jsonify({"error": "File too large. Maximum limit is 2GB."}), 413
+            return jsonify({"error": error_msg}), 413
+        
+        # Check if upload can start now (concurrency limits)
+        can_start, queue_position = queue.can_start_now(user_id)
+        if not can_start:
+            # For now, reject if at limit (queue system will be enhanced later)
+            # In future: return queue position for frontend to poll
+            max_per_user = queue.max_concurrent_per_user
+            return jsonify({
+                "error": f"Upload limit reached. Max {max_per_user} concurrent uploads per user.",
+                "queue_position": queue_position
+            }), 429
+        
+        # Register upload with queue
+        job = queue.register_upload(upload_id, user_id, filename, file_size)
             
         mime_type = request.form.get('mime_type', 'application/octet-stream')
         
         # Process in background
         thread = threading.Thread(
             target=process_background_upload,
-            args=(final_temp_path, filename, user_id, mime_type, file_size, parent_id),
+            args=(final_temp_path, filename, user_id, mime_type, file_size, parent_id, upload_id),
             daemon=True 
         )
         thread.start()
@@ -1436,8 +1460,10 @@ def download_file(file_id=None, token=None):
         print(traceback.format_exc())
         return str(e), 500
 
-def process_background_upload(filepath, original_filename, user_id, mime_type, file_size, parent_id=None):
+def process_background_upload(filepath, original_filename, user_id, mime_type, file_size, parent_id=None, upload_id=None):
     """Background task to upload to Telegram and save to DB."""
+    queue = get_upload_queue()
+    success = False
     try:
         print(f"[BG] Starting background upload for {original_filename} (User: {user_id})")
         
@@ -1512,6 +1538,7 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
             # Update final file status
             # db.update_file_status(file_id, "ready")  # TODO: Add status column to Supabase schema
             print(f"[BG] SUCCESS: {original_filename} is ready.")
+            success = True  # Mark as successful for queue tracking
 
         except Exception as ue:
             print(f"[BG] Upload error: {ue}")
@@ -1536,6 +1563,10 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
         # Ensure cleanup on failure
         if os.path.exists(filepath):
             os.remove(filepath)
+    finally:
+        # Always release the queue slot
+        if upload_id:
+            queue.complete_upload(upload_id, success=success, error=None if success else 'Upload failed')
 
 @app.route('/move_files', methods=['POST'])
 @csrf.exempt

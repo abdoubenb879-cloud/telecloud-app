@@ -180,6 +180,91 @@
                         </button>
                     </section>
                 </div>
+
+                <!-- Orphaned files cleanup script - inside spa-content so it loads on AJAX nav -->
+                <script>
+                    // Check for orphaned files on page load
+                    (function () {
+                        checkOrphanedFiles();
+                    })();
+
+                    async function checkOrphanedFiles() {
+                        try {
+                            const response = await fetch('/orphaned_files');
+                            const data = await response.json();
+
+                            const countEl = document.getElementById('orphanedCount');
+                            const btnEl = document.getElementById('cleanupBtn');
+
+                            if (!countEl || !btnEl) return;
+
+                            if (data.count > 0) {
+                                countEl.textContent = `Found ${data.count} failed upload(s)`;
+                                countEl.style.color = 'var(--warning)';
+                                btnEl.disabled = false;
+                            } else {
+                                countEl.textContent = 'No failed uploads found ✓';
+                                countEl.style.color = 'var(--success)';
+                                btnEl.disabled = true;
+                                btnEl.innerHTML = '<i class="fas fa-check"></i> All Clean!';
+                            }
+                        } catch (e) {
+                            console.error('Failed to check orphaned files:', e);
+                            const countEl = document.getElementById('orphanedCount');
+                            if (countEl) countEl.textContent = 'Unable to check';
+                        }
+                    }
+
+                    async function cleanupOrphanedFiles() {
+                        const btn = document.getElementById('cleanupBtn');
+                        const originalText = btn.innerHTML;
+
+                        if (!confirm('This will permanently delete files that failed to upload. You can re-upload them afterwards. Continue?')) {
+                            return;
+                        }
+
+                        btn.disabled = true;
+                        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cleaning...';
+
+                        try {
+                            const response = await fetch('/cleanup_orphaned', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                                }
+                            });
+
+                            const data = await response.json();
+
+                            if (data.status === 'success') {
+                                if (typeof showToast === 'function') {
+                                    showToast(`Cleaned up ${data.deleted} failed uploads. You can now re-upload them.`);
+                                } else {
+                                    alert(`Cleaned up ${data.deleted} failed uploads. You can now re-upload them.`);
+                                }
+                                // Refresh the count
+                                checkOrphanedFiles();
+                            } else {
+                                if (typeof showToast === 'function') {
+                                    showToast(data.error || 'Cleanup failed', 'error');
+                                } else {
+                                    alert(data.error || 'Cleanup failed');
+                                }
+                                btn.innerHTML = originalText;
+                                btn.disabled = false;
+                            }
+                        } catch (e) {
+                            if (typeof showToast === 'function') {
+                                showToast('Cleanup failed: ' + e.message, 'error');
+                            } else {
+                                alert('Cleanup failed: ' + e.message);
+                            }
+                            btn.innerHTML = originalText;
+                            btn.disabled = false;
+                        }
+                    }
+                </script>
             </div> <!-- End spa-content-container -->
             {% if not is_ajax %}
         </main>
@@ -259,75 +344,6 @@
 
     <script src="{{ url_for('static', filename='modal.js') }}?v=5"></script>
     <script src="{{ url_for('static', filename='app.js') }}?v={{ range(1, 10000) | random }}"></script>
-
-    <script>
-        // Check for orphaned files on page load
-        document.addEventListener('DOMContentLoaded', function () {
-            checkOrphanedFiles();
-        });
-
-        async function checkOrphanedFiles() {
-            try {
-                const response = await fetch('/orphaned_files');
-                const data = await response.json();
-
-                const countEl = document.getElementById('orphanedCount');
-                const btnEl = document.getElementById('cleanupBtn');
-
-                if (data.count > 0) {
-                    countEl.textContent = `Found ${data.count} failed upload(s)`;
-                    countEl.style.color = 'var(--warning)';
-                    btnEl.disabled = false;
-                } else {
-                    countEl.textContent = 'No failed uploads found ✓';
-                    countEl.style.color = 'var(--success)';
-                    btnEl.disabled = true;
-                    btnEl.textContent = 'All Clean!';
-                }
-            } catch (e) {
-                console.error('Failed to check orphaned files:', e);
-                document.getElementById('orphanedCount').textContent = 'Unable to check';
-            }
-        }
-
-        async function cleanupOrphanedFiles() {
-            const btn = document.getElementById('cleanupBtn');
-            const originalText = btn.innerHTML;
-
-            if (!confirm('This will permanently delete files that failed to upload. You can re-upload them afterwards. Continue?')) {
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cleaning...';
-
-            try {
-                const response = await fetch('/cleanup_orphaned', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                    }
-                });
-
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    showToast(`Cleaned up ${data.deleted} failed uploads. You can now re-upload them.`);
-                    // Refresh the count
-                    checkOrphanedFiles();
-                } else {
-                    showToast(data.error || 'Cleanup failed', 'error');
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                }
-            } catch (e) {
-                showToast('Cleanup failed: ' + e.message, 'error');
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }
-        }
-    </script>
     {% endif %}
 </body>
 

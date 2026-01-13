@@ -271,6 +271,39 @@ class CloudDatabase:
         # Then delete file
         self._request("files", method="DELETE", params={"id": f"eq.{file_id}", "user_id": f"eq.{user_id}"})
 
+    def get_orphaned_files(self, user_id):
+        """Find files that have 0 chunks (failed uploads) for a user."""
+        # Get all non-folder files for the user
+        files = self._request("files", params={
+            "user_id": f"eq.{user_id}",
+            "is_folder": "eq.false",
+            "deleted_at": "is.null",
+            "select": "id,filename,total_size,chunk_count,created_at"
+        })
+        
+        orphaned = []
+        if files:
+            for f in files:
+                # Check if file has any chunks
+                chunks = self.get_chunks(f['id'])
+                if len(chunks) == 0 and f.get('chunk_count', 0) > 0:
+                    # File should have chunks but doesn't
+                    orphaned.append(f)
+        
+        return orphaned
+
+    def delete_orphaned_files(self, user_id):
+        """Delete all orphaned files (0 chunks) for a user. Returns count deleted."""
+        orphaned = self.get_orphaned_files(user_id)
+        count = 0
+        for f in orphaned:
+            try:
+                self.delete_file(f['id'], user_id)
+                count += 1
+            except Exception as e:
+                print(f"[DB] Failed to delete orphaned file {f['id']}: {e}")
+        return count
+
     # ========== EMAIL AUTH METHODS ==========
     
     def get_user_by_email(self, email):

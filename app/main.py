@@ -365,6 +365,47 @@ def create_folder_ajax():
         return jsonify({"error": str(e)}), 500
 
 
+# ========== ORPHANED FILES MANAGEMENT ==========
+
+@app.route('/orphaned_files', methods=['GET'])
+def get_orphaned_files():
+    """List files that have 0 chunks (failed uploads)."""
+    if Config.MULTI_USER and 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    user_id = session.get('user_id', 'local')
+    
+    try:
+        orphaned = db.get_orphaned_files(user_id)
+        return jsonify({
+            "count": len(orphaned),
+            "files": orphaned,
+            "message": f"Found {len(orphaned)} files with missing content (0 chunks). These uploads failed and need to be re-uploaded."
+        })
+    except Exception as e:
+        print(f"[ORPHAN] Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/cleanup_orphaned', methods=['POST'])
+@csrf.exempt
+def cleanup_orphaned_files():
+    """Delete all orphaned files (0 chunks) for the current user."""
+    if Config.MULTI_USER and 'user_id' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    user_id = session.get('user_id', 'local')
+    
+    try:
+        count = db.delete_orphaned_files(user_id)
+        return jsonify({
+            "status": "success",
+            "deleted": count,
+            "message": f"Successfully deleted {count} orphaned files. You can now re-upload them."
+        })
+    except Exception as e:
+        print(f"[CLEANUP] Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route('/login', methods=['GET', 'POST'])
 @rate_limit

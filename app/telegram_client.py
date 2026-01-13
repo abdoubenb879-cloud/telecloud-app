@@ -270,8 +270,34 @@ class BotClient:
     
     def _run_async(self, coro, timeout=120):
         """Run async operation in the background loop with timeout."""
+        import sys
+        
+        # Check if loop is actually running
+        if _loop is None:
+            print("[BOT] ERROR: Background loop is None!", flush=True)
+            raise RuntimeError("Background event loop not initialized")
+        
+        if not _loop.is_running():
+            print("[BOT] ERROR: Background loop is not running!", flush=True)
+            raise RuntimeError("Background event loop is not running")
+        
+        print(f"[BOT] Submitting coroutine to loop (loop running: {_loop.is_running()})", flush=True)
+        
         future = asyncio.run_coroutine_threadsafe(coro, _loop)
-        return future.result(timeout=timeout)
+        
+        print(f"[BOT] Future created, waiting up to {timeout}s for result...", flush=True)
+        sys.stdout.flush()
+        
+        try:
+            result = future.result(timeout=timeout)
+            print(f"[BOT] Future completed successfully", flush=True)
+            return result
+        except TimeoutError:
+            print(f"[BOT] TIMEOUT: Coroutine did not complete in {timeout}s", flush=True)
+            raise
+        except Exception as e:
+            print(f"[BOT] Future raised exception: {type(e).__name__}: {e}", flush=True)
+            raise
     
     @classmethod
     def get_cooldown_status(cls):
@@ -427,49 +453,49 @@ class BotClient:
     def upload_chunks_parallel(self, chunk_paths, max_concurrent=3):
         """Upload multiple chunks in parallel to Telegram."""
         target = self.channel_id
-        print(f"[BOT] Starting parallel upload of {len(chunk_paths)} chunks to channel {target}")
-        print(f"[BOT] Chunk paths: {chunk_paths}")
+        print(f"[BOT] Starting parallel upload of {len(chunk_paths)} chunks to channel {target}", flush=True)
+        print(f"[BOT] Chunk paths: {chunk_paths}", flush=True)
         
         async def upload_single(cp, idx):
-            print(f"[BOT] >>> Entering upload_single for chunk {idx+1}")
-            print(f"[BOT] Uploading chunk {idx+1}/{len(chunk_paths)}: {os.path.basename(cp)}")
+            print(f"[BOT] >>> Entering upload_single for chunk {idx+1}", flush=True)
+            print(f"[BOT] Uploading chunk {idx+1}/{len(chunk_paths)}: {os.path.basename(cp)}", flush=True)
             try:
-                print(f"[BOT] Calling send_document for chunk {idx+1}...")
+                print(f"[BOT] Calling send_document for chunk {idx+1}...", flush=True)
                 result = await self.client.send_document(
                     target,
                     document=cp,
                     file_name=os.path.basename(cp)
                 )
-                print(f"[BOT] Chunk {idx+1} uploaded successfully, msg_id: {result.id}")
+                print(f"[BOT] Chunk {idx+1} uploaded successfully, msg_id: {result.id}", flush=True)
                 return result
             except Exception as e:
-                print(f"[BOT] Chunk {idx+1} upload FAILED: {type(e).__name__}: {e}")
+                print(f"[BOT] Chunk {idx+1} upload FAILED: {type(e).__name__}: {e}", flush=True)
                 import traceback
                 traceback.print_exc()
                 raise
         
         async def work():
-            print(f"[BOT] >>> Entering work() coroutine")
+            print(f"[BOT] >>> Entering work() coroutine", flush=True)
             results = []
             for i in range(0, len(chunk_paths), max_concurrent):
                 batch = chunk_paths[i:i + max_concurrent]
                 batch_indices = list(range(i, min(i + max_concurrent, len(chunk_paths))))
-                print(f"[BOT] Processing batch: chunks {batch_indices}")
+                print(f"[BOT] Processing batch: chunks {batch_indices}", flush=True)
                 try:
-                    print(f"[BOT] About to gather uploads for batch...")
+                    print(f"[BOT] About to gather uploads for batch...", flush=True)
                     batch_results = await asyncio.gather(*[upload_single(cp, idx) for idx, cp in zip(batch_indices, batch)])
-                    print(f"[BOT] Batch completed with {len(batch_results)} results")
+                    print(f"[BOT] Batch completed with {len(batch_results)} results", flush=True)
                     results.extend(batch_results)
                 except Exception as e:
-                    print(f"[BOT] Batch upload FAILED: {type(e).__name__}: {e}")
+                    print(f"[BOT] Batch upload FAILED: {type(e).__name__}: {e}", flush=True)
                     import traceback
                     traceback.print_exc()
                     raise
-            print(f"[BOT] All batches complete, returning {len(results)} results")
+            print(f"[BOT] All batches complete, returning {len(results)} results", flush=True)
             return results
         
         # Use 10 minute timeout for large file uploads
-        print(f"[BOT] Calling _run_async with 600s timeout...")
+        print(f"[BOT] Calling _run_async with 600s timeout...", flush=True)
         try:
             result = self._run_async(work(), timeout=600)
             print(f"[BOT] _run_async returned successfully")

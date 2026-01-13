@@ -264,20 +264,52 @@ class BotClient:
         self._initialized = True
         print("[BOT] BotClient initialized successfully")
     
+    # Class-level cooldown tracking (shared across all instances)
+    _flood_wait_until = 0  # Unix timestamp when FloodWait expires
+    _flood_wait_duration = 0  # Original duration for logging
+    
     def _run_async(self, coro, timeout=120):
         """Run async operation in the background loop with timeout."""
         future = asyncio.run_coroutine_threadsafe(coro, _loop)
         return future.result(timeout=timeout)
     
-    def connect(self, max_retries=2):
-        """Start the bot client (thread-safe with timeout and FloodWait handling)."""
+    @classmethod
+    def get_cooldown_status(cls):
+        """Check if we're in a FloodWait cooldown period."""
+        import time as time_module
+        now = time_module.time()
+        if now < cls._flood_wait_until:
+            remaining = int(cls._flood_wait_until - now)
+            return True, remaining
+        return False, 0
+    
+    @classmethod
+    def clear_cooldown(cls):
+        """Manually clear the cooldown (use with caution)."""
+        cls._flood_wait_until = 0
+        cls._flood_wait_duration = 0
+        print("[BOT] FloodWait cooldown manually cleared")
+    
+    def connect(self, max_retries=1):
+        """Start the bot client (thread-safe with FloodWait cooldown)."""
         from pyrogram.errors import FloodWait
         import time as time_module
+        
+        # Check if we're in cooldown - don't even try to connect
+        in_cooldown, remaining = BotClient.get_cooldown_status()
+        if in_cooldown:
+            print(f"[BOT] In FloodWait cooldown. {remaining}s remaining. Skipping connection attempt.")
+            raise Exception(f"FloodWait cooldown active. Wait {remaining} seconds before retry.")
         
         # Use lock to prevent multiple threads from triggering simultaneous auth
         with BotClient._lock:
             if self._connected:
                 return self
+            
+            # Double-check cooldown inside lock
+            in_cooldown, remaining = BotClient.get_cooldown_status()
+            if in_cooldown:
+                raise Exception(f"FloodWait cooldown active. Wait {remaining} seconds before retry.")
                 
             for attempt in range(max_retries):
                 try:
@@ -287,18 +319,19 @@ class BotClient:
                     # Use 60 second timeout to prevent hanging forever
                     self._run_async(work(), timeout=60)
                     self._connected = True
+                    # Clear cooldown on successful connection
+                    BotClient._flood_wait_until = 0
                     print(f"[BOT] Connected to channel {self.channel_id}")
                     return self
                     
                 except FloodWait as fw:
-                    wait_time = fw.value if hasattr(fw, 'value') else 60
-                    print(f"[BOT] FloodWait: Must wait {wait_time} seconds before retry")
-                    if attempt < max_retries - 1 and wait_time <= 120:
-                        # Only wait if it's a reasonable time
-                        time_module.sleep(min(wait_time + 5, 120))
-                    else:
-                        print(f"[BOT] FloodWait too long ({wait_time}s), will retry on next request")
-                        raise
+                    wait_time = fw.value if hasattr(fw, 'value') else 300
+                    # Set cooldown to prevent future attempts
+                    BotClient._flood_wait_until = time_module.time() + wait_time
+                    BotClient._flood_wait_duration = wait_time
+                    print(f"[BOT] FloodWait: {wait_time}s. Cooldown set until {BotClient._flood_wait_until}")
+                    print(f"[BOT] NO MORE CONNECTION ATTEMPTS will be made for {wait_time} seconds")
+                    raise Exception(f"Telegram FloodWait: Must wait {wait_time} seconds")
                         
                 except Exception as e:
                     print(f"[BOT] Connection attempt {attempt+1} failed: {e}")

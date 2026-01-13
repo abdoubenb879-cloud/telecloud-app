@@ -271,6 +271,13 @@ class BotClient:
     def _run_async(self, coro, timeout=120):
         """Run async operation in the background loop with timeout."""
         import sys
+        global _loop, _loop_thread
+        
+        # CRITICAL: After gunicorn forks, the background thread doesn't exist!
+        # We must ensure the loop is running in THIS process
+        if _loop_thread is None or not _loop_thread.is_alive():
+            print("[BOT] Background thread not alive, recreating event loop...", flush=True)
+            ensure_loop_running()
         
         # Check if loop is actually running
         if _loop is None:
@@ -279,9 +286,11 @@ class BotClient:
         
         if not _loop.is_running():
             print("[BOT] ERROR: Background loop is not running!", flush=True)
-            raise RuntimeError("Background event loop is not running")
+            # Try to recreate it
+            print("[BOT] Attempting to recreate event loop...", flush=True)
+            ensure_loop_running()
         
-        print(f"[BOT] Submitting coroutine to loop (loop running: {_loop.is_running()})", flush=True)
+        print(f"[BOT] Submitting coroutine to loop (loop running: {_loop.is_running()}, thread alive: {_loop_thread.is_alive() if _loop_thread else False})", flush=True)
         
         future = asyncio.run_coroutine_threadsafe(coro, _loop)
         

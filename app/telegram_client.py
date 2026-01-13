@@ -278,6 +278,22 @@ class BotClient:
         if _loop_thread is None or not _loop_thread.is_alive():
             print("[BOT] Background thread not alive, recreating event loop...", flush=True)
             ensure_loop_running()
+            
+            # CRITICAL FIX: Also reset client state after fork!
+            # The old client was connected to the dead loop
+            if self._connected:
+                print("[BOT] Resetting client connection state after fork...", flush=True)
+                self._connected = False
+                # Recreate the Pyrogram client instance for the new loop
+                self.client = Client(
+                    "telecloud_bot",
+                    api_id=Config.TELEGRAM_API_ID,
+                    api_hash=Config.TELEGRAM_API_HASH,
+                    bot_token=Config.BOT_TOKEN,
+                    in_memory=True,
+                    no_updates=True
+                )
+                print("[BOT] New client instance created, will reconnect on demand", flush=True)
         
         # Check if loop is actually running
         if _loop is None:

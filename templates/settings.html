@@ -152,6 +152,22 @@
                         </div>
                     </section>
 
+                    <!-- Storage Maintenance Section -->
+                    <section class="card mb-6">
+                        <h3 class="mb-2"><i class="fas fa-broom"
+                                style="color: var(--primary); margin-right: 8px;"></i>Storage Maintenance</h3>
+                        <p class="text-secondary mb-4" style="font-size: 0.9rem;">
+                            Clean up files that failed to upload (have 0 chunks stored in Telegram).
+                            These files appear in your list but cannot be downloaded.
+                        </p>
+                        <div class="settings-value-row">
+                            <span class="text-secondary" id="orphanedCount">Checking...</span>
+                            <button class="btn btn-warning" id="cleanupBtn" onclick="cleanupOrphanedFiles()">
+                                <i class="fas fa-trash-alt"></i> Clean Up Failed Uploads
+                            </button>
+                        </div>
+                    </section>
+
                     <!-- Danger Zone -->
                     <section class="card" style="border-color: var(--danger-subtle);">
                         <h3 class="mb-2 text-danger">Danger Zone</h3>
@@ -243,6 +259,75 @@
 
     <script src="{{ url_for('static', filename='modal.js') }}?v=5"></script>
     <script src="{{ url_for('static', filename='app.js') }}?v={{ range(1, 10000) | random }}"></script>
+
+    <script>
+        // Check for orphaned files on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            checkOrphanedFiles();
+        });
+
+        async function checkOrphanedFiles() {
+            try {
+                const response = await fetch('/orphaned_files');
+                const data = await response.json();
+
+                const countEl = document.getElementById('orphanedCount');
+                const btnEl = document.getElementById('cleanupBtn');
+
+                if (data.count > 0) {
+                    countEl.textContent = `Found ${data.count} failed upload(s)`;
+                    countEl.style.color = 'var(--warning)';
+                    btnEl.disabled = false;
+                } else {
+                    countEl.textContent = 'No failed uploads found ✓';
+                    countEl.style.color = 'var(--success)';
+                    btnEl.disabled = true;
+                    btnEl.textContent = 'All Clean!';
+                }
+            } catch (e) {
+                console.error('Failed to check orphaned files:', e);
+                document.getElementById('orphanedCount').textContent = 'Unable to check';
+            }
+        }
+
+        async function cleanupOrphanedFiles() {
+            const btn = document.getElementById('cleanupBtn');
+            const originalText = btn.innerHTML;
+
+            if (!confirm('This will permanently delete files that failed to upload. You can re-upload them afterwards. Continue?')) {
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cleaning...';
+
+            try {
+                const response = await fetch('/cleanup_orphaned', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    showToast(`Cleaned up ${data.deleted} failed uploads. You can now re-upload them.`);
+                    // Refresh the count
+                    checkOrphanedFiles();
+                } else {
+                    showToast(data.error || 'Cleanup failed', 'error');
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                showToast('Cleanup failed: ' + e.message, 'error');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+    </script>
     {% endif %}
 </body>
 

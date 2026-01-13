@@ -295,6 +295,11 @@ class BotClient:
         from pyrogram.errors import FloodWait
         import time as time_module
         
+        # CRITICAL FIX: Check if already connected FIRST, before cooldown check
+        # This prevents false failures when bot connected successfully at startup
+        if self._connected:
+            return self
+        
         # Check if we're in cooldown - don't even try to connect
         in_cooldown, remaining = BotClient.get_cooldown_status()
         if in_cooldown:
@@ -303,6 +308,7 @@ class BotClient:
         
         # Use lock to prevent multiple threads from triggering simultaneous auth
         with BotClient._lock:
+            # Double-check connected status inside lock (another thread might have connected)
             if self._connected:
                 return self
             

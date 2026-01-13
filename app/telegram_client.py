@@ -284,6 +284,8 @@ class BotClient:
             if self._connected:
                 print("[BOT] Resetting client connection state after fork...", flush=True)
                 self._connected = False
+                # Set the event loop for this thread (required for Pyrogram Client constructor)
+                asyncio.set_event_loop(_loop)
                 # Recreate the Pyrogram client instance for the new loop
                 self.client = Client(
                     "telecloud_bot",
@@ -294,6 +296,7 @@ class BotClient:
                     no_updates=True
                 )
                 print("[BOT] New client instance created, will reconnect on demand", flush=True)
+
 
         
         # Check if loop is actually running

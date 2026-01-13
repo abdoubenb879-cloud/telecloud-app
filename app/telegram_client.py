@@ -273,39 +273,11 @@ class BotClient:
         import sys
         global _loop, _loop_thread
         
-        # CRITICAL: After gunicorn forks, the background thread doesn't exist!
-        # We must ensure the loop is running in THIS process
+        # Ensure the loop thread is running in THIS process 
+        # (needed for fresh worker processes after gunicorn fork)
         if _loop_thread is None or not _loop_thread.is_alive():
-            print("[BOT] Background thread not alive, recreating event loop...", flush=True)
+            print("[BOT] Background thread not alive, starting event loop...", flush=True)
             ensure_loop_running()
-            
-            # CRITICAL FIX: Also reset client state after fork!
-            # The old client was connected to the dead loop
-            if self._connected:
-                print("[BOT] Resetting client connection state after fork...", flush=True)
-                self._connected = False
-                # Set the event loop for this thread (required for Pyrogram Client constructor)
-                asyncio.set_event_loop(_loop)
-                # Recreate the Pyrogram client instance for the new loop
-                self.client = Client(
-                    "telecloud_bot",
-                    api_id=Config.API_ID,
-                    api_hash=Config.API_HASH,
-                    bot_token=Config.BOT_TOKEN,
-                    in_memory=True,
-                    no_updates=True
-                )
-                print("[BOT] New client instance created, starting it...", flush=True)
-                # Start the client NOW so it's fully connected
-                async def start_client():
-                    await self.client.start()
-                future = asyncio.run_coroutine_threadsafe(start_client(), _loop)
-                future.result(timeout=60)  # Wait up to 60s for connect
-                self._connected = True
-                print(f"[BOT] New client connected to channel {self.channel_id}", flush=True)
-
-
-
         
         # Check if loop is actually running
         if _loop is None:
@@ -314,10 +286,9 @@ class BotClient:
         
         if not _loop.is_running():
             print("[BOT] ERROR: Background loop is not running!", flush=True)
-            # Try to recreate it
-            print("[BOT] Attempting to recreate event loop...", flush=True)
             ensure_loop_running()
         
+
         print(f"[BOT] Submitting coroutine to loop (loop running: {_loop.is_running()}, thread alive: {_loop_thread.is_alive() if _loop_thread else False})", flush=True)
         
         future = asyncio.run_coroutine_threadsafe(coro, _loop)

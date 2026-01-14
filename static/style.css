@@ -367,6 +367,78 @@ a:hover {
     padding: var(--space-8);
 }
 
+/* Content Actions (Header Right Side) */
+.content-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-shrink: 0;
+}
+
+.content-actions .btn span {
+    display: inline;
+}
+
+/* Search Input */
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-input-wrapper .search-icon {
+    position: absolute;
+    left: var(--space-3);
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    pointer-events: none;
+}
+
+.search-input-wrapper .form-input {
+    padding-left: 36px;
+    width: 200px;
+    height: 40px;
+}
+
+/* Hide text on mobile, show icon only */
+@media (max-width: 992px) {
+    .content-actions .btn span {
+        display: none;
+    }
+
+    .content-actions .btn {
+        padding: var(--space-2);
+    }
+
+    .search-input-wrapper .form-input {
+        width: 150px;
+    }
+}
+
+@media (max-width: 768px) {
+    .content-header {
+        flex-wrap: wrap;
+        height: auto;
+        padding: var(--space-3) var(--space-4);
+        gap: var(--space-3);
+    }
+
+    .content-title {
+        order: 1;
+        flex: 1;
+    }
+
+    .content-actions {
+        order: 2;
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .search-input-wrapper {
+        display: none;
+    }
+}
+
 /* ============= Cards ============= */
 .card {
     background: var(--bg-card);

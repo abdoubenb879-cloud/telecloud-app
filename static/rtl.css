@@ -3,34 +3,33 @@
    Arabic/Right-to-Left Styles
    ================================================ */
 
-/* Language Switcher Button */
+/* Language Switcher Button - Inside sidebar header */
 .lang-switcher {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    padding: 8px 16px;
+    margin-left: auto;
+    padding: 6px 12px;
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius-full);
     color: var(--text-primary);
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 500;
     cursor: pointer;
     transition: all var(--transition-base);
-    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
 }
 
 .lang-switcher:hover {
     background: var(--bg-card-hover);
     border-color: var(--primary);
-    transform: scale(1.05);
 }
 
-/* RTL body class */
+/* RTL body class - move margin to right */
 body.rtl .lang-switcher {
-    right: auto;
-    left: 20px;
+    margin-left: 0;
+    margin-right: auto;
 }
 
 /* ============= RTL Layout Overrides ============= */
@@ -76,22 +75,34 @@ body.rtl .action-buttons {
 }
 
 /* Margins and Paddings */
-body.rtl .ml-1, body.rtl .ml-2, body.rtl .ml-3, body.rtl .ml-4 {
+body.rtl .ml-1,
+body.rtl .ml-2,
+body.rtl .ml-3,
+body.rtl .ml-4 {
     margin-left: 0;
     margin-right: var(--space-2);
 }
 
-body.rtl .mr-1, body.rtl .mr-2, body.rtl .mr-3, body.rtl .mr-4 {
+body.rtl .mr-1,
+body.rtl .mr-2,
+body.rtl .mr-3,
+body.rtl .mr-4 {
     margin-right: 0;
     margin-left: var(--space-2);
 }
 
-body.rtl .pl-1, body.rtl .pl-2, body.rtl .pl-3, body.rtl .pl-4 {
+body.rtl .pl-1,
+body.rtl .pl-2,
+body.rtl .pl-3,
+body.rtl .pl-4 {
     padding-left: 0;
     padding-right: var(--space-2);
 }
 
-body.rtl .pr-1, body.rtl .pr-2, body.rtl .pr-3, body.rtl .pr-4 {
+body.rtl .pr-1,
+body.rtl .pr-2,
+body.rtl .pr-3,
+body.rtl .pr-4 {
     padding-right: 0;
     padding-left: var(--space-2);
 }
@@ -154,7 +165,8 @@ body.rtl select {
 
 body.rtl input[type="email"],
 body.rtl input[type="number"] {
-    text-align: left; /* Keep LTR for emails and numbers */
+    text-align: left;
+    /* Keep LTR for emails and numbers */
     direction: ltr;
 }
 
@@ -250,21 +262,28 @@ body.rtl .upload-area {
         left: auto;
         right: 0;
     }
-    
+
     body.rtl .mobile-menu-toggle {
         left: auto;
         right: var(--space-4);
     }
-    
-    body.rtl .lang-switcher {
-        top: auto;
-        bottom: 80px;
-        right: 20px;
-        left: auto;
+
+    .lang-switcher {
+        right: var(--space-4);
+        top: var(--space-3);
     }
-    
+
+    body.rtl .lang-switcher {
+        right: auto;
+        left: var(--space-4);
+    }
+
     body.rtl .main-content {
         margin-right: 0;
+    }
+
+    body.rtl .content-actions {
+        flex-direction: row-reverse;
     }
 }
 

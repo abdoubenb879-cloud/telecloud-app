@@ -108,6 +108,9 @@ const Translator = {
     },
 
     createLanguageSwitcher() {
+        // Check if already exists
+        if (document.getElementById('lang-switcher')) return;
+
         // Create language switcher button
         const switcher = document.createElement('button');
         switcher.id = 'lang-switcher';
@@ -122,13 +125,15 @@ const Translator = {
             switcher.title = newLang === 'ar' ? 'Switch to English' : 'التبديل إلى العربية';
         });
 
-        // Add to navbar or body
-        const navbar = document.querySelector('.navbar-right, .nav-right, .header-right');
-        if (navbar) {
-            navbar.prepend(switcher);
-        } else {
-            document.body.appendChild(switcher);
+        // Try to add to sidebar header first (best placement)
+        const sidebarHeader = document.querySelector('.sidebar-header');
+        if (sidebarHeader) {
+            sidebarHeader.appendChild(switcher);
+            return;
         }
+
+        // Fallback: add to body (will use fixed position)
+        document.body.appendChild(switcher);
     }
 };
 

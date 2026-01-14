@@ -57,9 +57,9 @@
                     {% endif %}
                 </div>
                 <div class="file-card-info">
-                    <div class="file-name">{{ file.name }}</div>
+                    <div class="file-name">{{ file.filename }}</div>
                     <div class="file-meta">
-                        <span>{{ (file.size / 1024 / 1024)|round(2) }} MB</span>
+                        <span>{{ (file.total_size / 1024 / 1024)|round(2) }} MB</span>
                         <span class="dot-separator">•</span>
                         <span>Deleted recently</span>
                     </div>

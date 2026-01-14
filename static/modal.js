@@ -231,7 +231,7 @@ const Modal = {
         return new Promise((resolve) => {
             const modalId = 'modal-' + Date.now();
             const modalHtml = `
-            < div class="modal-overlay active" id = "${modalId}" style = "z-index: 9999;" >
+            <div class="modal-overlay active" id="${modalId}" style="z-index: 9999;">
                 <div class="modal-content animate-scale-up" style="max-width: 400px;">
                     <div class="modal-header">
                         <h3 class="modal-title">${title}</h3>
@@ -248,16 +248,16 @@ const Modal = {
                         <button class="btn btn-primary" id="confirm-${modalId}">OK</button>
                     </div>
                 </div>
-            </div >
+            </div>
     `;
 
             document.body.insertAdjacentHTML('beforeend', modalHtml);
 
             const modal = document.getElementById(modalId);
-            const input = document.getElementById(`input - ${modalId} `);
-            const confirmBtn = document.getElementById(`confirm - ${modalId} `);
-            const cancelBtn = document.getElementById(`cancel - ${modalId} `);
-            const closeBtn = document.getElementById(`close - ${modalId} `);
+            const input = document.getElementById(`input-${modalId}`);
+            const confirmBtn = document.getElementById(`confirm-${modalId}`);
+            const cancelBtn = document.getElementById(`cancel-${modalId}`);
+            const closeBtn = document.getElementById(`close-${modalId}`);
 
             const cleanup = () => {
                 modal.classList.remove('active');
@@ -303,7 +303,7 @@ const Modal = {
         return new Promise((resolve) => {
             const modalId = 'modal-' + Date.now();
             const modalHtml = `
-    < div class="modal-overlay active" id = "${modalId}" style = "z-index: 9999;" >
+                <div class="modal-overlay active" id="${modalId}" style="z-index: 9999;">
         <div class="modal-content animate-scale-up" style="max-width: 450px;">
             <div class="modal-header">
                 <h3 class="modal-title">Move items to...</h3>
@@ -345,7 +345,7 @@ const Modal = {
                 </div>
             </div>
         </div>
-            </div >
+                </div>
     `;
 
             document.body.insertAdjacentHTML('beforeend', modalHtml);
@@ -353,16 +353,16 @@ const Modal = {
             // Add styles for hover effect
             const style = document.createElement('style');
             style.innerHTML = `
-        .folder - item:hover { background: rgba(255, 255, 255, 0.05); }
-                .folder - item input: checked + i + div { color: var(--primary); }
+                .folder-item:hover { background: rgba(255, 255, 255, 0.05); }
+                .folder-item input:checked + i + div { color: var(--primary); }
 `;
             document.head.appendChild(style);
 
             const modal = document.getElementById(modalId);
-            const confirmBtn = document.getElementById(`confirm - ${modalId} `);
-            const cancelBtn = document.getElementById(`cancel - ${modalId} `);
-            const closeBtn = document.getElementById(`close - ${modalId} `);
-            const newFolderBtn = document.getElementById(`new- folder - ${modalId} `);
+            const confirmBtn = document.getElementById(`confirm-${modalId}`);
+            const cancelBtn = document.getElementById(`cancel-${modalId}`);
+            const closeBtn = document.getElementById(`close-${modalId}`);
+            const newFolderBtn = document.getElementById(`new-folder-${modalId}`);
 
             const cleanup = () => {
                 modal.classList.remove('active');

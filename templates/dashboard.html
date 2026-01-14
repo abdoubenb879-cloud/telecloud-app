@@ -44,10 +44,11 @@
     <div class="stats-row mb-6">
         <div class="stat-card">
             <div class="stat-card-label" data-i18n="dashboard.storage_used">Storage Used</div>
-            <div class="stat-card-value">{{ (files|sum(attribute='size') / 1024 / 1024)|round(2) }} MB</div>
+            <div class="stat-card-value">{{ (files|sum(attribute='total_size') / 1024 / 1024)|round(2) }} MB</div>
             <div class="progress-bar mt-2">
                 <div class="progress-fill"
-                    style="width: {{ [((files|sum(attribute='size') / 1024 / 1024) / 500 * 100), 100]|min }}%"></div>
+                    style="width: {{ [((files|sum(attribute='total_size') / 1024 / 1024) / 500 * 100), 100]|min }}%">
+                </div>
             </div>
         </div>
         <div class="stat-card">
@@ -66,7 +67,7 @@
         {% else %}
         {% for file in files %}
         <div class="file-card animate-fade-in" id="file-{{ file.id }}"
-            data-type="{{ 'folder' if file.is_folder else 'file' }}" data-name="{{ file.name }}">
+            data-type="{{ 'folder' if file.is_folder else 'file' }}" data-name="{{ file.filename }}">
             <div class="file-card-header">
                 <div class="file-checkbox-wrapper">
                     <input type="checkbox" class="file-checkbox" value="{{ file.id }}">
@@ -89,7 +90,7 @@
                         </a>
                         {% endif %}
                         <a href="javascript:void(0)" class="dropdown-item"
-                            onclick="renameItem('{{ file.id }}', '{{ file.name }}', {{ 'true' if file.is_folder else 'false' }})">
+                            onclick="renameItem('{{ file.id }}', '{{ file.filename }}', {{ 'true' if file.is_folder else 'false' }})">
                             <i class="fas fa-edit"></i> <span data-i18n="actions.rename">Rename</span>
                         </a>
                         <div class="dropdown-divider"></div>
@@ -107,7 +108,7 @@
                     <i class="fas fa-folder text-primary" style="font-size: 3rem;"></i>
                     {% else %}
                     {% if file.mime_type and file.mime_type.startswith('image/') %}
-                    <img src="/thumbnail/{{ file.id }}" alt="{{ file.name }}" class="file-thumbnail"
+                    <img src="/thumbnail/{{ file.id }}" alt="{{ file.filename }}" class="file-thumbnail"
                         onerror="this.innerHTML='<i class=\'fas fa-file-image\'></i>'; this.className='fas fa-file-image text-primary';">
                     {% elif file.mime_type and file.mime_type.startswith('video/') %}
                     <i class="fas fa-file-video text-accent" style="font-size: 3rem;"></i>
@@ -119,10 +120,10 @@
                     {% endif %}
                 </div>
                 <div class="file-card-info">
-                    <div class="file-name" title="{{ file.name }}">{{ file.name }}</div>
+                    <div class="file-name" title="{{ file.filename }}">{{ file.filename }}</div>
                     <div class="file-meta">
                         {% if not file.is_folder %}
-                        <span>{{ (file.size / 1024 / 1024)|round(2) }} MB</span>
+                        <span>{{ (file.total_size / 1024 / 1024)|round(2) }} MB</span>
                         <span class="dot-separator">•</span>
                         {% endif %}
                         <span>{{ file.created_at.split('T')[0] if 'T' in file.created_at else file.created_at }}</span>

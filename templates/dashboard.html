@@ -1,1344 +1,148 @@
-{% if not is_ajax %}
-<!DOCTYPE html>
-<html lang="en">
+{% extends "layout.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Khaznati - خزنتي | Secure Cloud Storage</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ range(1, 10000) | random }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='rtl.css') }}?v=1">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#6366f1">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1726377663312980"
-        crossorigin="anonymous"></script>
-</head>
+{% block title %}Dashboard{% endblock %}
 
-<body>
+{% block content %}
+<!-- Header -->
+<header class="content-header">
+    <div class="content-title">
+        <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
+            <i class="fas fa-bars"></i>
+        </button>
 
-    <div class="app-layout">
-        <!-- Sidebar -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="Khaznati" class="sidebar-logo"
-                    style="width: 40px; height: 40px;">
-                <span class="sidebar-brand brand-name">Khaznati</span>
+        <nav class="breadcrumbs">
+            <a href="/" class="breadcrumb-item" data-i18n="dashboard.my_files">My Files</a>
+            {% for crumb in breadcrumbs %}
+            <span class="breadcrumb-separator">/</span>
+            <a href="/?folder_id={{ crumb.id }}" class="breadcrumb-item {% if loop.last %}active{% endif %}">
+                {{ crumb.name }}
+            </a>
+            {% endfor %}
+        </nav>
+    </div>
+
+    <div class="content-actions">
+        <div class="search-input-wrapper mr-3">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" id="fileSearch" class="form-input" placeholder="Search files..."
+                data-i18n="dashboard.search">
+        </div>
+
+        <button class="btn btn-ghost mr-2" onclick="openNewFolderModal()">
+            <i class="fas fa-folder-plus"></i> <span data-i18n="dashboard.new_folder">New Folder</span>
+        </button>
+
+        <button class="btn btn-primary" onclick="document.getElementById('fileUploadInput').click()">
+            <i class="fas fa-upload"></i> <span data-i18n="dashboard.upload">Upload</span>
+        </button>
+        <input type="file" id="fileUploadInput" multiple style="display: none;" onchange="handleFiles(this.files)">
+    </div>
+</header>
+
+<div class="content-body" id="spa-content">
+    <!-- Storage Stats -->
+    <div class="stats-row mb-6">
+        <div class="stat-card">
+            <div class="stat-card-label" data-i18n="dashboard.storage_used">Storage Used</div>
+            <div class="stat-card-value">{{ (files|sum(attribute='size') / 1024 / 1024)|round(2) }} MB</div>
+            <div class="progress-bar mt-2">
+                <div class="progress-fill"
+                    style="width: {{ [((files|sum(attribute='size') / 1024 / 1024) / 500 * 100), 100]|min }}%"></div>
             </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-card-label" data-i18n="dashboard.files_count">Files</div>
+            <div class="stat-card-value">{{ files|length }}</div>
+        </div>
+    </div>
 
-            <nav class="sidebar-nav">
-                <div class="nav-section">
-                    <div class="nav-section-title">Storage</div>
-                    <a href="/" class="nav-item active">
-                        <i class="fas fa-folder"></i>
-                        <span data-i18n="dashboard.my_files">My Files</span>
-                    </a>
-                    <a href="/trash" class="nav-item">
-                        <i class="fas fa-trash-alt"></i>
-                        <span data-i18n="trash.title">Trash</span>
-                    </a>
+    <!-- File Grid -->
+    <div class="file-grid" id="fileContainer">
+        {% if not files %}
+        <div class="empty-state">
+            <i class="fas fa-cloud-upload-alt mb-4" style="font-size: 3rem; opacity: 0.3;"></i>
+            <h3 data-i18n="dashboard.no_files">No files yet. Upload your first file!</h3>
+        </div>
+        {% else %}
+        {% for file in files %}
+        <div class="file-card animate-fade-in" id="file-{{ file.id }}"
+            data-type="{{ 'folder' if file.is_folder else 'file' }}" data-name="{{ file.name }}">
+            <div class="file-card-header">
+                <div class="file-checkbox-wrapper">
+                    <input type="checkbox" class="file-checkbox" value="{{ file.id }}">
                 </div>
-
-                <div class="nav-section">
-                    <div class="nav-section-title">Account</div>
-                    <a href="/settings" class="nav-item">
-                        <i class="fas fa-cog"></i>
-                        <span data-i18n="settings.title">Settings</span>
-                    </a>
-                </div>
-            </nav>
-
-            <div class="sidebar-footer">
-                <div class="user-card" onclick="toggleUserMenu()">
-                    <div class="user-avatar">{{ username[0]|upper if username else 'U' }}</div>
-                    <div class="user-info">
-                        <div class="user-name">
-                            {{ username }}
-                        </div>
-                    </div>
-                    <i class="fas fa-chevron-up user-chevron"></i>
-                </div>
-
-                <div class="dropdown-menu" id="userMenu" style="bottom: 100%; top: auto; margin-bottom: 8px;">
-                    <a href="/settings" class="dropdown-item">
-                        <i class="fas fa-cog"></i> Settings
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    <a href="/logout" class="dropdown-item danger">
-                        <i class="fas fa-sign-out-alt"></i> Sign Out
-                    </a>
-                </div>
-            </div>
-        </aside>
-
-        <main class="main-content" id="main-content-area">
-            {% endif %}
-            <div id="spa-content-container">
-                <!-- Header -->
-                <header class="content-header">
-                    <div class="content-title">
-                        <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </button>
-
-                        <nav class="breadcrumbs">
-                            <a href="/" class="breadcrumb-item">My Files</a>
-                            {% for crumb in breadcrumbs %}
-                            <span class="breadcrumb-separator">/</span>
-                            <a href="/?folder_id={{ crumb.id }}"
-                                class="breadcrumb-item {% if loop.last %}active{% endif %}">
-                                {{ crumb.name }}
-                            </a>
-                            {% endfor %}
-                        </nav>
-                    </div>
-
-                    <div class="flex gap-3">
-                        <button class="btn btn-ghost" id="selectModeBtn" onclick="toggleSelectMode()">
-                            <i class="fas fa-check-square"></i>
-                            <span class="hide-mobile">Select</span>
-                        </button>
-                        <button class="btn btn-secondary" onclick="openCreateFolderModal()">
-                            <i class="fas fa-folder-plus"></i>
-                            <span class="hide-mobile">New Folder</span>
-                        </button>
-                        <div class="btn-group">
-                            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <span class="hide-mobile">Upload</span>
-                            </button>
-                            <button class="btn btn-primary" onclick="document.getElementById('folderInput').click()"
-                                title="Upload Folder">
-                                <i class="fas fa-folder-open"></i>
-                            </button>
-                        </div>
-                        <input type="file" id="fileInput" multiple hidden onchange="handleFileSelect(event)">
-                        <input type="file" id="folderInput" webkitdirectory directory multiple hidden
-                            onchange="handleFolderSelect(event)">
-                    </div>
-                </header>
-
-                <!-- Selection Action Bar (hidden by default) -->
-                <div class="selection-bar hidden" id="selectionBar">
-                    <div class="selection-info">
-                        <button class="btn btn-ghost btn-sm" onclick="selectAll()">
-                            <i class="fas fa-check-double"></i> Select All
-                        </button>
-                        <span id="selectedCount">0 selected</span>
-                    </div>
-                    <div class="selection-actions">
-                        <button class="btn btn-primary btn-sm" onclick="downloadSelected()">
-                            <i class="fas fa-download"></i>
-                            <span class="hide-mobile">Download</span>
-                        </button>
-                        <button class="btn btn-secondary btn-sm" onclick="moveSelected()">
-                            <i class="fas fa-file-export"></i>
-                            <span class="hide-mobile">Move</span>
-                        </button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteSelected()">
-                            <i class="fas fa-trash"></i>
-                            <span class="hide-mobile">Delete</span>
-                        </button>
-                        <button class="btn btn-ghost btn-sm" onclick="cancelSelection()">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Content Body -->
-                <div class="content-body">
-                    <!-- Upload Zone -->
-                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-                        <div class="upload-zone-icon">
-                            <i class="fas fa-cloud-upload-alt"></i>
-                        </div>
-                        <div class="upload-zone-title">Drop files here or click to upload</div>
-                        <div class="upload-zone-text">
-                            Maximum file size: 2GB
-                        </div>
-                    </div>
-
-                    <!-- Upload Progress -->
-                    <div id="uploadProgress" class="card mt-6 hidden">
-                        <div class="flex items-center justify-between mb-2">
-                            <span id="uploadStatus" class="text-secondary">Uploading...</span>
-                            <span id="uploadPercent" class="text-primary">0%</span>
-                        </div>
-                        <div id="uploadFileName" class="text-muted mb-2"
-                            style="font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-                        </div>
-                    </div>
-
-                    <!-- Ad Banner -->
-                    <div class="card mt-6" style="text-align: center; padding: 12px;">
-                        <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Advertisement</p>
-                        <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-1726377663312980"
-                            data-ad-slot="7827162592" data-ad-format="auto" data-full-width-responsive="true"></ins>
-                        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-                    </div>
-
-                    <!-- Files Grid -->
-                    <div class="mt-6">
-                        {% if files %}
-                        <div class="file-grid" id="fileGrid">
-                            {% for file in files %}
-                            <div class="file-card animate-scale-up" data-id="{{ file.id if multi_user else file[0] }}"
-                                data-is-folder="{{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }}"
-                                onclick="handleFileClick(event, {{ file.id if multi_user else file[0] }}, {{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }})">
-
-                                <!-- Selection checkbox (hidden unless in select mode) -->
-                                <div class="file-select-checkbox"
-                                    onclick="event.stopPropagation(); toggleFileSelection({{ file.id if multi_user else file[0] }})">
-                                    <i class="far fa-square unchecked"></i>
-                                    <i class="fas fa-check-square checked"></i>
-                                </div>
-
-                                <div class="file-actions">
-                                    <button class="btn btn-icon btn-sm btn-ghost"
-                                        onclick="event.stopPropagation(); openFileMenu({{ file.id if multi_user else file[0] }}, '{{ (file.filename if multi_user else file[1])|e }}', {{ 'true' if (file.is_folder if multi_user else file[5]) else 'false' }})">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                </div>
-
-                                <div class="file-preview">
-                                    {% set filename = file.filename if multi_user else file[1] %}
-                                    {% set is_folder = file.is_folder if multi_user else file[5] %}
-                                    {% set file_id = file.id if multi_user else file[0] %}
-
-                                    {% if is_folder %}
-                                    <i class="file-icon fas fa-folder" style="color: #fbbf24;"></i>
-                                    {% elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4',
-                                    '.mov', '.webm', '.mkv')) %}
-                                    <img src="/thumbnail/{{ file_id }}" alt="{{ filename }}" loading="lazy"
-                                        onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                    <i class="file-icon fas {{ getFileIcon(filename) }}" style="display:none;"></i>
-                                    {% else %}
-                                    <i class="file-icon fas {{ getFileIcon(filename) }}"></i>
-                                    {% endif %}
-                                </div>
-
-                                <div class="file-name" title="{{ filename }}">{{ filename }}</div>
-                                <div class="file-meta">
-                                    {% if is_folder %}
-                                    Folder
-                                    {% else %}
-                                    {% set size = file.total_size or file.file_size or file.size or (file[2] if file is
-                                    sequence else 0) %}
-                                    {{ "%.1f"|format((size or 0) / 1024 / 1024) }} MB
-                                    {% endif %}
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
+                <div class="dropdown">
+                    <button class="btn btn-icon btn-ghost" onclick="toggleDropdown(event, 'drop-{{ file.id }}')">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <div class="dropdown-menu" id="drop-{{ file.id }}">
+                        {% if file.is_folder %}
+                        <a href="/?folder_id={{ file.id }}" class="dropdown-item">
+                            <i class="fas fa-folder-open"></i> Open
+                        </a>
                         {% else %}
-                        <div class="empty-state">
-                            <div class="empty-state-icon">
-                                <i class="fas fa-folder-open"></i>
-                            </div>
-                            <h3 class="empty-state-title">No files yet</h3>
-                            <p class="empty-state-text">Upload your first file to get started</p>
-                            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
-                                <i class="fas fa-cloud-upload-alt"></i> Upload Files
-                            </button>
-                        </div>
+                        <a href="/download/{{ file.id }}" class="dropdown-item">
+                            <i class="fas fa-download"></i> <span data-i18n="actions.download">Download</span>
+                        </a>
+                        <a href="javascript:void(0)" class="dropdown-item" onclick="openShareModal('{{ file.id }}')">
+                            <i class="fas fa-share-alt"></i> <span data-i18n="actions.share">Share</span>
+                        </a>
                         {% endif %}
-                    </div> <!-- End spa-content-container -->
-                    {% if not is_ajax %}
-        </main>
-    </div>
-
-    <!-- File Context Menu Modal -->
-    <div class="modal-overlay" id="fileMenuModal" onclick="closeFileMenu()">
-        <div class="modal-content" style="max-width: 280px; padding: var(--space-3);" onclick="event.stopPropagation()">
-            <div class="dropdown-item" id="filePreviewBtn" onclick="previewFile(currentFileId)">
-                <i class="fas fa-eye"></i> Preview
-            </div>
-            <div class="dropdown-item" id="fileDownloadBtn" onclick="downloadFile(currentFileId)">
-                <i class="fas fa-download"></i> Download
-            </div>
-            <div class="dropdown-item" id="folderDownloadBtn" style="display: none;"
-                onclick="downloadFolder(currentFileId)">
-                <i class="fas fa-download"></i> Download Folder
-            </div>
-            <div class="dropdown-item" id="fileShareBtn" onclick="shareFile(currentFileId)">
-                <i class="fas fa-share-alt"></i> Share
-            </div>
-            <div class="dropdown-item" id="folderShareBtn" style="display: none;" onclick="shareFolder(currentFileId)">
-                <i class="fas fa-share-alt"></i> Share Folder
-            </div>
-            <div class="dropdown-item" onclick="renameFile(currentFileId, currentFileName)">
-                <i class="fas fa-edit"></i> Rename
-            </div>
-            <div class="dropdown-divider"></div>
-            <div class="dropdown-item danger" onclick="deleteFile(currentFileId)">
-                <i class="fas fa-trash"></i> Move to Trash
-            </div>
-        </div>
-    </div>
-
-    <!-- Create Folder Modal -->
-    <div class="modal-overlay" id="createFolderModal" onclick="closeCreateFolderModal()">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <div class="modal-header">
-                <h3 class="modal-title">Create New Folder</h3>
-                <button class="modal-close" onclick="closeCreateFolderModal()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <form onsubmit="createFolder(event)">
-                <div class="form-group">
-                    <label class="form-label">Folder Name</label>
-                    <input type="text" id="folderNameInput" class="form-input" placeholder="My Folder" required>
-                </div>
-                <div class="flex gap-3 justify-end">
-                    <button type="button" class="btn btn-secondary" onclick="closeCreateFolderModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-
-    <!-- Loading Overlay -->
-    <div class="modal-overlay" id="loadingOverlay" style="background: rgba(0,0,0,0.9);">
-        <div class="flex flex-col items-center gap-4">
-            <div class="spinner spinner-lg"></div>
-            <p id="loadingText" class="text-secondary">Loading...</p>
-        </div>
-    </div>
-
-    <!-- Preview Modal -->
-    <div class="modal-overlay" id="previewModal" onclick="closePreview()">
-        <div class="preview-modal-content" onclick="event.stopPropagation()">
-            <div class="preview-header">
-                <h3 id="previewFileName" class="preview-title">File Preview</h3>
-                <button class="modal-close" onclick="closePreview()">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="preview-body" id="previewContent">
-                <div class="flex flex-col items-center gap-4">
-                    <div class="spinner spinner-lg"></div>
-                    <p class="text-secondary">Loading preview...</p>
+                        <a href="javascript:void(0)" class="dropdown-item"
+                            onclick="renameItem('{{ file.id }}', '{{ file.name }}', {{ 'true' if file.is_folder else 'false' }})">
+                            <i class="fas fa-edit"></i> <span data-i18n="actions.rename">Rename</span>
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a href="javascript:void(0)" class="dropdown-item danger" onclick="deleteItem('{{ file.id }}')">
+                            <i class="fas fa-trash"></i> <span data-i18n="actions.delete">Delete</span>
+                        </a>
+                    </div>
                 </div>
             </div>
-            <div class="preview-footer">
-                <button class="btn btn-secondary" onclick="closePreview()">Close</button>
-                <button class="btn btn-primary" id="previewDownloadBtn" onclick="downloadFile(currentFileId)">
-                    <i class="fas fa-download"></i> Download
-                </button>
-            </div>
+
+            <a href="{{ '/?folder_id=' + file.id|string if file.is_folder else 'javascript:void(0)' }}"
+                class="file-card-body" {% if not file.is_folder %}onclick="previewFile('{{ file.id }}')" {% endif %}>
+                <div class="file-icon-wrapper">
+                    {% if file.is_folder %}
+                    <i class="fas fa-folder text-primary" style="font-size: 3rem;"></i>
+                    {% else %}
+                    {% if file.mime_type and file.mime_type.startswith('image/') %}
+                    <img src="/thumbnail/{{ file.id }}" alt="{{ file.name }}" class="file-thumbnail"
+                        onerror="this.innerHTML='<i class=\'fas fa-file-image\'></i>'; this.className='fas fa-file-image text-primary';">
+                    {% elif file.mime_type and file.mime_type.startswith('video/') %}
+                    <i class="fas fa-file-video text-accent" style="font-size: 3rem;"></i>
+                    {% elif file.mime_type and (file.mime_type == 'application/pdf') %}
+                    <i class="fas fa-file-pdf text-danger" style="font-size: 3rem;"></i>
+                    {% else %}
+                    <i class="fas fa-file-alt text-secondary" style="font-size: 3rem;"></i>
+                    {% endif %}
+                    {% endif %}
+                </div>
+                <div class="file-card-info">
+                    <div class="file-name" title="{{ file.name }}">{{ file.name }}</div>
+                    <div class="file-meta">
+                        {% if not file.is_folder %}
+                        <span>{{ (file.size / 1024 / 1024)|round(2) }} MB</span>
+                        <span class="dot-separator">•</span>
+                        {% endif %}
+                        <span>{{ file.created_at.split('T')[0] if 'T' in file.created_at else file.created_at }}</span>
+                    </div>
+                </div>
+            </a>
         </div>
+        {% endfor %}
+        {% endif %}
     </div>
+</div>
 
-    {% endif %}
-    {% if not is_ajax %}
-    <!-- Global Progress Notification Bar -->
-    <div id="globalProgressBar" class="global-progress-bar">
-        <div class="progress-header">
-            <div class="progress-title">
-                <i class="fas fa-cloud-upload-alt"></i>
-                <span id="globalProgressTitle">Processing...</span>
-            </div>
-            <div class="progress-rate" id="globalProgressRate">0 KB/s</div>
+<!-- Upload Progress Overlay (Persistent) -->
+<div id="uploadOverlay" class="upload-overlay hidden">
+    <div class="upload-overlay-card">
+        <div class="upload-overlay-header">
+            <h4 data-i18n="upload_modal.uploading">Uploading Files</h4>
+            <span id="uploadCount">0/0</span>
         </div>
-        <div class="progress-track">
-            <div id="globalProgressFill" class="progress-fill-global"></div>
-        </div>
-        <div class="progress-details">
-            <span id="globalProgressStatus">Wait...</span>
-            <span id="globalProgressPercent">0%</span>
-        </div>
+        <div id="uploadList" class="upload-list"></div>
     </div>
-
-    <!-- Navigation Loading Bar -->
-    <div id="navLoadingBar" class="nav-loading-bar"></div>
-
-    <script src="{{ url_for('static', filename='modal.js') }}?v=5"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v={{ range(1, 10000) | random }}"></script>
-    <script>
-        // Dashboard-specific Logic (File Uploads, Selection Mode)
-
-        // Global Upload Controller
-        const GlobalUpload = {
-            activeThreads: 0,
-            updateProgress(percent, rate, status, filename) {
-                const bar = document.getElementById('globalProgressBar');
-                const fill = document.getElementById('globalProgressFill');
-                const rateEl = document.getElementById('globalProgressRate');
-                const statusEl = document.getElementById('globalProgressStatus');
-                const percentEl = document.getElementById('globalProgressPercent');
-                const titleEl = document.getElementById('globalProgressTitle');
-
-                bar.classList.add('active');
-                fill.style.width = percent + '%';
-                rateEl.textContent = rate;
-                statusEl.textContent = status;
-                percentEl.textContent = percent + '%';
-                titleEl.textContent = filename ? `Uploading: ${filename}` : 'Uploading files...';
-
-                if (percent >= 100) {
-                    setTimeout(() => {
-                        this.activeThreads--;
-                        if (this.activeThreads <= 0) {
-                            bar.classList.remove('active');
-                            this.activeThreads = 0;
-                        }
-                    }, 3000);
-                }
-            }
-        };
-
-        // Global state
-        let currentFileId = null;
-        let currentFileName = null;
-        // csrfToken is now in app.js, but we rely on the meta tag.
-        const currentFolderId = {{ folder_id or 'null' }};
-
-        // Hide loading on page load
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        if (loadingOverlay) loadingOverlay.style.display = 'none';
-
-        // Register Service Worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js')
-                    .then(reg => console.log('SW Registered'))
-                    .catch(err => console.log('SW Fail', err));
-            });
-        }
-    </script>
-    {% endif %}
-    {% if not is_ajax %}
-    <script>
-        // Selection state
-        let selectMode = false;
-        let selectedFiles = new Set();
-
-        // Toggle select mode
-        function toggleSelectMode() {
-            selectMode = !selectMode;
-            document.body.classList.toggle('select-mode', selectMode);
-            const btn = document.getElementById('selectModeBtn');
-            if (btn) btn.classList.toggle('active', selectMode);
-
-            if (!selectMode) {
-                cancelSelection();
-            } else {
-                const bar = document.getElementById('selectionBar');
-                if (bar) bar.classList.remove('hidden');
-            }
-            updateSelectionCount();
-        }
-
-        // Toggle individual file selection
-        function toggleFileSelection(fileId) {
-            const card = document.querySelector(`[data-id="${fileId}"]`);
-            if (!card) return;
-
-            if (selectedFiles.has(fileId)) {
-                selectedFiles.delete(fileId);
-                card.classList.remove('selected');
-            } else {
-                selectedFiles.add(fileId);
-                card.classList.add('selected');
-            }
-            updateSelectionCount();
-        }
-
-        // Select all files
-        function selectAll() {
-            const cards = document.querySelectorAll('.file-card');
-            cards.forEach(card => {
-                const id = parseInt(card.dataset.id);
-                const isFolder = card.dataset.isFolder === 'true';
-                if (!isFolder) { // Only select files, not folders
-                    selectedFiles.add(id);
-                    card.classList.add('selected');
-                }
-            });
-            updateSelectionCount();
-        }
-
-        // Cancel selection
-        function cancelSelection() {
-            selectedFiles.clear();
-            document.querySelectorAll('.file-card.selected').forEach(card => {
-                card.classList.remove('selected');
-            });
-            const bar = document.getElementById('selectionBar');
-            if (bar) bar.classList.add('hidden');
-            selectMode = false;
-            document.body.classList.remove('select-mode');
-            const btn = document.getElementById('selectModeBtn');
-            if (btn) btn.classList.remove('active');
-            updateSelectionCount();
-        }
-
-        // Update selection count display
-        function updateSelectionCount() {
-            const count = selectedFiles.size;
-            const countEl = document.getElementById('selectedCount');
-            if (countEl) countEl.textContent = `${count} selected`;
-        }
-
-        async function moveSelected() {
-            if (selectedFiles.size === 0) return;
-
-            // Simple showLoading shim if not global
-            const loading = document.getElementById('loadingOverlay');
-            if (loading) loading.style.display = 'flex';
-
-            try {
-                const res = await fetch('/api/folders');
-                const data = await res.json();
-                if (loading) loading.style.display = 'none';
-
-                if (data.folders) {
-                    const availableFolders = data.folders.filter(f => !selectedFiles.has(f.id));
-                    let targetFolderId = await Modal.folderSelect(availableFolders);
-
-                    if (targetFolderId === null) return; // User cancelled
-                    if (targetFolderId === 'root') targetFolderId = null;
-
-                    if (loading) loading.style.display = 'flex';
-
-                    const moveRes = await fetch('/move_files', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
-                        },
-                        body: JSON.stringify({
-                            file_ids: Array.from(selectedFiles),
-                            target_folder_id: targetFolderId
-                        })
-                    });
-
-                    const moveData = await moveRes.json();
-                    if (loading) loading.style.display = 'none';
-
-                    if (moveData.message) {
-                        cancelSelection();
-                        refreshFileGrid(); // Make sure this is defined or handled
-                        await Modal.alert('Success', moveData.message);
-                    } else {
-                        throw new Error(moveData.error || 'Move failed');
-                    }
-                }
-            } catch (e) {
-                if (loading) loading.style.display = 'none';
-                await Modal.alert('Error', e.message || 'An error occurred during move');
-            }
-        }
-
-        async function refreshFileGrid() {
-            // Check if we are on the dashboard
-            if (window.location.pathname !== '/') return;
-            // Simple reload for now to ensure consistency, or use SPA nav to self
-            navigateSPA(window.location.href, false);
-        }
-
-        // Download selected files as ZIP
-        // Download selected files sequentially
-        async function downloadSelected() {
-            if (selectedFiles.size === 0) {
-                await Modal.alert('No Selection', 'Please select files to download.');
-                return;
-            }
-
-            const filesToDownload = Array.from(selectedFiles);
-            GlobalUpload.activeThreads++;
-            GlobalUpload.updateProgress(20, 'Preparing...', `Batching ${filesToDownload.length} files`, 'Building ZIP...');
-
-            try {
-                const response = await fetch('/download_batch', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
-                    },
-                    body: JSON.stringify({ file_ids: filesToDownload })
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Batch download failed');
-                }
-
-                // Handle the blob response
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `TeleCloud_Batch_${Date.now()}.zip`;
-                document.body.appendChild(a);
-                a.click();
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                }, 100);
-
-                GlobalUpload.updateProgress(100, 'Done', 'Download Started', 'TeleCloud_Batch.zip');
-                cancelSelection();
-
-                setTimeout(() => {
-                    GlobalUpload.activeThreads--;
-                    // Refresh if needed, but usually not for downloads
-                }, 2000);
-
-            } catch (e) {
-                GlobalUpload.activeThreads--;
-                await Modal.alert('Download Error', e.message || 'An error occurred during batch download.');
-            }
-        }
-
-        // Delete selected files
-        async function deleteSelected() {
-            if (selectedFiles.size === 0) {
-                await Modal.alert('No Selection', 'Please select files to delete.');
-                return;
-            }
-
-            const confirmed = await Modal.confirm(
-                'Move to Trash?',
-                `Move ${selectedFiles.size} file(s) to trash?`,
-                'Move to Trash',
-                'Cancel',
-                true
-            );
-
-            if (!confirmed) return;
-
-            showLoading('Moving files to trash...');
-
-            try {
-                for (const fileId of selectedFiles) {
-                    await fetch(`/delete/${fileId}`, {
-                        method: 'POST',
-                        headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content }
-                    });
-                }
-                hideLoading();
-                refreshFileGrid();
-                cancelSelection();
-            } catch (e) {
-                hideLoading();
-                await Modal.alert('Error', 'Failed to delete some files');
-            }
-        }
-
-        // File click handler
-        function handleFileClick(event, fileId, isFolder) {
-            if (event.target.closest('.file-actions')) return;
-            if (event.target.closest('.file-select-checkbox')) return;
-
-            // In select mode, clicking toggles selection
-            if (selectMode && !isFolder) {
-                toggleFileSelection(fileId);
-                return;
-            }
-
-            if (isFolder) {
-                navigateSPA(`/?folder_id=${fileId}`);
-            } else {
-                previewFile(fileId);
-            }
-        }
-
-        // File menu
-        let currentIsFolder = false;
-
-        function openFileMenu(fileId, fileName, isFolder = false) {
-            currentFileId = fileId;
-            currentFileName = fileName;
-            currentIsFolder = isFolder;
-
-            // Show/hide folder-specific options
-            const folderDownloadBtn = document.getElementById('folderDownloadBtn');
-            const folderShareBtn = document.getElementById('folderShareBtn');
-            const fileDownloadBtn = document.getElementById('fileDownloadBtn');
-            const filePreviewBtn = document.getElementById('filePreviewBtn');
-            const fileShareBtn = document.getElementById('fileShareBtn');
-
-            if (folderDownloadBtn) folderDownloadBtn.style.display = isFolder ? 'flex' : 'none';
-            if (folderShareBtn) folderShareBtn.style.display = isFolder ? 'flex' : 'none';
-            if (fileDownloadBtn) fileDownloadBtn.style.display = isFolder ? 'none' : 'flex';
-            if (filePreviewBtn) filePreviewBtn.style.display = isFolder ? 'none' : 'flex';
-            if (fileShareBtn) fileShareBtn.style.display = isFolder ? 'none' : 'flex';
-
-            document.getElementById('fileMenuModal').classList.add('active');
-        }
-
-        function closeFileMenu() {
-            document.getElementById('fileMenuModal').classList.remove('active');
-        }
-
-        // Download folder as ZIP
-        async function downloadFolder(folderId) {
-            closeFileMenu();
-            showLoading('Preparing folder for download...');
-
-            try {
-                const response = await fetch(`/download/folder/${folderId}`, {
-                    headers: { 'X-CSRFToken': csrfToken }
-                });
-
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${currentFileName}.zip`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                    hideLoading();
-                } else {
-                    throw new Error('Download failed');
-                }
-            } catch (e) {
-                hideLoading();
-                await Modal.alert('Error', 'Failed to download folder');
-            }
-        }
-
-        // Create folder
-        function openCreateFolderModal() {
-            document.getElementById('createFolderModal').classList.add('active');
-            document.getElementById('folderNameInput').focus();
-        }
-
-        function closeCreateFolderModal() {
-            document.getElementById('createFolderModal').classList.remove('active');
-        }
-
-        async function createFolder(event) {
-            event.preventDefault();
-            const name = document.getElementById('folderNameInput').value.trim();
-            if (!name) return;
-
-            showLoading('Creating folder...');
-
-            try {
-                const formData = new FormData();
-                formData.append('name', name);
-                if (currentFolderId) formData.append('parent_id', currentFolderId);
-
-                const response = await fetch('/create_folder', {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': csrfToken },
-                    body: formData
-                });
-
-                if (response.ok) {
-                    refreshFileGrid();
-                    closeCreateFolderModal();
-                    hideLoading();
-                } else {
-                    alert('Failed to create folder');
-                    hideLoading();
-                }
-            } catch (e) {
-                alert('Error creating folder');
-                hideLoading();
-            }
-        }
-
-        // Preview
-        async function previewFile(fileId) {
-            closeFileMenu();
-            currentFileId = fileId;
-
-            // Show modal with loading state
-            const modal = document.getElementById('previewModal');
-            const content = document.getElementById('previewContent');
-            const fileName = document.getElementById('previewFileName');
-
-            content.innerHTML = `
-    <div class="flex flex-col items-center gap-4">
-        <div class="spinner spinner-lg"></div>
-        <p class="text-secondary">Loading preview...</p>
-    </div>
-    `;
-            modal.classList.add('active');
-
-            try {
-                // Fetch file info to get filename and type
-                const response = await fetch(`/preview/${fileId}`);
-                const contentType = response.headers.get('content-type') || '';
-
-                // Get filename from Content-Disposition header or use generic
-                const disposition = response.headers.get('content-disposition');
-                let name = 'File Preview';
-                if (disposition) {
-                    const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                    if (match && match[1]) {
-                        name = match[1].replace(/['"]/g, '');
-                    }
-                }
-                fileName.textContent = name;
-
-                if (contentType.startsWith('image/')) {
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    content.innerHTML = `<img src="${url}" alt="${name}" class="preview-image">`;
-                } else if (contentType.startsWith('video/')) {
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    content.innerHTML = `<video src="${url}" controls class="preview-video" autoplay></video>`;
-                } else if (contentType.startsWith('audio/')) {
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    content.innerHTML = `
-    <div class="preview-audio">
-        <i class="fas fa-music" style="font-size: 4rem; color: var(--primary); margin-bottom: 1rem;"></i>
-        <audio src="${url}" controls autoplay></audio>
-    </div>
-    `;
-                } else if (contentType === 'application/pdf') {
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    content.innerHTML = `<iframe src="${url}" class="preview-pdf"></iframe>`;
-                } else if (contentType.startsWith('text/')) {
-                    const text = await response.text();
-                    content.innerHTML = `
-    <pre class="preview-text">${escapeHtml(text)}</pre>`;
-                } else {
-                    // Unsupported file type
-                    content.innerHTML = `
-    <div class="flex flex-col items-center gap-4 text-center">
-        <i class="fas fa-file" style="font-size: 4rem; color: var(--text-muted);"></i>
-        <p class="text-secondary">Preview not available for this file type</p>
-        <p class="text-muted" style="font-size: 0.85rem;">${contentType || 'Unknown type'}</p>
-    </div>
-    `;
-                }
-            } catch (error) {
-                content.innerHTML = `
-    <div class="flex flex-col items-center gap-4 text-center">
-        <i class="fas fa-exclamation-circle" style="font-size: 4rem; color: var(--danger);"></i>
-        <p class="text-secondary">Failed to load preview</p>
-        <p class="text-muted" style="font-size: 0.85rem;">${error.message}</p>
-    </div>
-    `;
-            }
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        function closePreview() {
-            document.getElementById('previewModal').classList.remove('active');
-            document.getElementById('previewContent').innerHTML = '';
-        }
-
-        // Download
-        function downloadFile(fileId) {
-            closeFileMenu();
-            showLoading('Preparing download...');
-            setTimeout(() => {
-                hideLoading();
-                window.location.href = `/download/${fileId}`;
-            }, 500); // Small delay for UX
-        }
-
-        // Share
-        async function shareFile(fileId) {
-            closeFileMenu();
-            showLoading('Generating share link...');
-
-            try {
-                const response = await fetch('/generate_share', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
-                    },
-                    body: JSON.stringify({ file_id: fileId })
-                });
-
-                const data = await response.json();
-                hideLoading();
-
-                if (data.share_url) {
-                    await navigator.clipboard.writeText(data.share_url);
-                    await Modal.alert('Success', 'Share link copied to clipboard!');
-                } else {
-                    throw new Error('No URL returned');
-                }
-            } catch (e) {
-                hideLoading();
-                await Modal.alert('Error', 'Failed to generate share link');
-            }
-        }
-
-        // Share folder
-        async function shareFolder(folderId) {
-            closeFileMenu();
-            showLoading('Generating folder share link...');
-
-            try {
-                const response = await fetch('/generate_share', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
-                    },
-                    body: JSON.stringify({ file_id: folderId, is_folder: true })
-                });
-
-                const data = await response.json();
-                hideLoading();
-
-                if (data.share_url) {
-                    await navigator.clipboard.writeText(data.share_url);
-                    await Modal.alert('Success', 'Folder share link copied to clipboard!');
-                } else {
-                    throw new Error('No URL returned');
-                }
-            } catch (e) {
-                hideLoading();
-                await Modal.alert('Error', 'Failed to generate folder share link');
-            }
-        }
-
-        // Rename
-        // Rename
-        async function renameFile(fileId, currentName) {
-            closeFileMenu();
-            const newName = await Modal.prompt('Rename File', 'Enter new name:', currentName || '');
-            if (!newName || newName === currentName) return;
-
-            showLoading('Renaming...');
-
-            try {
-                const response = await fetch('/rename', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken
-                    },
-                    body: JSON.stringify({ file_id: fileId, new_name: newName })
-                });
-
-                if (response.ok) {
-                    refreshFileGrid();
-                    hideLoading();
-                } else {
-                    await Modal.alert('Error', 'Failed to rename file');
-                    hideLoading();
-                }
-            } catch (e) {
-                await Modal.alert('Error', 'An error occurred while renaming');
-                hideLoading();
-            }
-        }
-
-        // Refresh File Grid (AJAX)
-        async function refreshFileGrid() {
-            try {
-                const response = await fetch(`/api/files?folder_id=${currentFolderId || ''}`);
-                const data = await response.json();
-
-                if (data.files) {
-                    const grid = document.querySelector('.file-grid');
-                    const emptyState = document.querySelector('.empty-state');
-
-                    if (data.files.length === 0) {
-                        if (grid) grid.style.display = 'none';
-                        if (emptyState) emptyState.style.display = 'flex';
-                        return;
-                    }
-
-                    if (emptyState) emptyState.style.display = 'none';
-                    if (grid) {
-                        grid.style.display = 'grid';
-                        grid.innerHTML = data.files.map(file => `
-                            <div class="file-card" data-id="${file.id}" 
-                                 onclick="handleFileClick(event, ${file.id}, ${file.is_folder})">
-                                 <div class="file-preview">
-                                    ${file.is_folder ?
-                                '<i class="file-icon fas fa-folder" style="color: #fbbf24;"></i>' :
-                                ((file.filename.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp|mp4|mov|webm|mkv)$/)) ?
-                                    `<img src="/thumbnail/${file.id}" alt="${file.filename}" loading="lazy" 
-                                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                     <i class="file-icon fas ${getFileIcon(file.filename)}" style="display:none;"></i>` :
-                                    `<i class="file-icon fas ${getFileIcon(file.filename)}"></i>`)
-                            }
-                                </div>
-                                <div class="file-info-row">
-                                    <div class="file-details">
-                                        <div class="file-name" title="${file.filename}">${file.filename}</div>
-                                        <div class="file-meta">
-                                            ${file.is_folder ? 'Folder' : formatSize(file.total_size)}
-                                        </div>
-                                    </div>
-                                    <button class="btn btn-icon btn-ghost" onclick="event.stopPropagation(); openFileMenu(${file.id}, '${file.filename.replace(/'/g, "\\'")}', ${file.is_folder})">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        `).join('');
-                    }
-                }
-            } catch (e) {
-                console.error('Failed to refresh file grid:', e);
-            }
-        }
-
-        function getFileIcon(filename) {
-            const ext = filename.split('.').pop().toLowerCase();
-            const icons = {
-                'pdf': 'fa-file-pdf',
-                'doc': 'fa-file-word', 'docx': 'fa-file-word',
-                'xls': 'fa-file-excel', 'xlsx': 'fa-file-excel',
-                'jpg': 'fa-file-image', 'jpeg': 'fa-file-image', 'png': 'fa-file-image', 'gif': 'fa-file-image',
-                'mp4': 'fa-file-video', 'mkv': 'fa-file-video', 'mov': 'fa-file-video',
-                'mp3': 'fa-file-audio', 'wav': 'fa-file-audio'
-            };
-            return icons[ext] || 'fa-file';
-        }
-
-        function formatSize(bytes) {
-            if (!bytes || bytes === 0) return '0.0 MB';
-            const mb = bytes / (1024 * 1024);
-            return mb.toFixed(1) + ' MB';
-        }
-
-        function formatDate(dateStr) {
-            if (!dateStr) return 'Recently';
-            const date = new Date(dateStr);
-            return date.toLocaleDateString();
-        }
-
-        // Delete
-        async function deleteFile(fileId) {
-            closeFileMenu();
-            const confirmed = await Modal.confirm('Move to Trash?', 'This file will be moved to trash.', 'Move to Trash', 'Cancel', true);
-            if (!confirmed) return;
-
-            showLoading('Moving to trash...');
-
-            try {
-                const response = await fetch(`/delete/${fileId}`, {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': csrfToken }
-                });
-
-                if (response.ok) {
-                    document.querySelector(`[data-id="${fileId}"]`)?.remove();
-                    hideLoading();
-                } else {
-                    await Modal.alert('Error', 'Failed to delete file');
-                    hideLoading();
-                }
-            } catch (e) {
-                await Modal.alert('Error', 'An error occurred while deleting');
-                hideLoading();
-            }
-        }
-
-
-
-        // Loading overlay
-        function showLoading(text = 'Loading...') {
-            document.getElementById('loadingText').textContent = text;
-            document.getElementById('loadingOverlay').classList.add('active');
-        }
-
-        function hideLoading() {
-            document.getElementById('loadingOverlay').classList.remove('active');
-        }
-
-        // File upload
-        const uploadZone = document.getElementById('uploadZone');
-
-        uploadZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadZone.classList.add('dragover');
-        });
-
-        uploadZone.addEventListener('dragleave', () => {
-            uploadZone.classList.remove('dragover');
-        });
-
-        uploadZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length) {
-                handleFiles(e.dataTransfer.files);
-            }
-        });
-
-        // ============================================================================
-        // LIGHTNING UPLOAD SYSTEM (Unified High-Speed Queue)
-        // ============================================================================
-        const UploadManager = {
-            queue: [],
-            activeRequests: 0,
-            maxConcurrent: 6, // Total parallel requests (browser limit)
-            maxFiles: 2,      // Max files processing at once
-            chunksPerFile: 3, // Max chunks per file
-            uploadedBytes: 0,
-            totalBytes: 0,
-            startTime: null,
-            isProcessing: false,
-            uploadedFilesCount: 0,
-            totalFilesCount: 0,
-
-            // Speed Calculation (Sliding Window)
-            progressLog: [], // {time, bytes}
-
-            // Atomic Folder Creation
-            folderCache: {},
-            folderCreationQueue: {}, // path -> promise
-
-            async init(files, isFolder = false) {
-                if (this.isProcessing) {
-                    this.queue.push(...Array.from(files));
-                    this.totalFilesCount += files.length;
-                    this.totalBytes += Array.from(files).reduce((acc, f) => acc + f.size, 0);
-                    return;
-                }
-
-                this.queue = Array.from(files);
-                this.totalFilesCount = this.queue.length;
-                this.uploadedFilesCount = 0;
-                this.uploadedBytes = 0;
-                this.totalBytes = this.queue.reduce((acc, f) => acc + f.size, 0);
-                this.startTime = Date.now();
-                this.progressLog = [{ time: Date.now(), bytes: 0 }];
-                this.isProcessing = true;
-                this.activeRequests = 0;
-
-                const rootName = isFolder ? this.queue[0].webkitRelativePath.split('/')[0] : 'Upload';
-                GlobalUpload.updateProgress(0, 'Starting...', `Preparing ${this.totalFilesCount} files`, rootName);
-
-                // Start parallel file workers
-                const workers = [];
-                for (let i = 0; i < this.maxFiles; i++) {
-                    workers.push(this.processQueue());
-                }
-
-                await Promise.all(workers);
-                this.finish(rootName);
-            },
-
-            async processQueue() {
-                while (this.queue.length > 0) {
-                    const file = this.queue.shift();
-                    try {
-                        await this.uploadFile(file);
-                        this.uploadedFilesCount++;
-                    } catch (e) {
-                        console.error("File upload failed", file.name, e);
-                    }
-                    this.updateUI(file.name);
-                }
-            },
-
-            async uploadFile(file) {
-                const chunkSize = 10 * 1024 * 1024; // 10MB for better UI responsiveness
-                const totalChunks = Math.ceil(file.size / chunkSize);
-                const uploadId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-
-                // Track progress per chunk for real-time aggregation
-                const chunkProgress = new Array(totalChunks).fill(0);
-
-                let targetFolderId = (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null;
-                if (file.webkitRelativePath) {
-                    const parts = file.webkitRelativePath.split('/');
-                    parts.pop();
-                    if (parts.length > 0) {
-                        targetFolderId = await this.ensureFolder(parts.join('/'), (typeof currentFolderId !== 'undefined' && currentFolderId !== null) ? currentFolderId : null);
-                    }
-                }
-
-                const chunkIndices = Array.from({ length: totalChunks }, (_, i) => i);
-                const chunkWorkers = [];
-
-                const processChunks = async () => {
-                    while (chunkIndices.length > 0) {
-                        const idx = chunkIndices.shift();
-                        try {
-                            await this.uploadChunkXHR(file, idx, chunkSize, totalChunks, uploadId, (p) => {
-                                const diff = p - chunkProgress[idx];
-                                chunkProgress[idx] = p;
-                                this.uploadedBytes += diff;
-                                this.logProgress(diff);
-                                this.updateUI(file.name);
-                            });
-                        } catch (e) {
-                            console.error(`Chunk ${idx} failed`, e);
-                            throw e;
-                        }
-                    }
-                }
-
-                for (let i = 0; i < this.chunksPerFile; i++) chunkWorkers.push(processChunks());
-                await Promise.all(chunkWorkers);
-
-                // Finalize
-                const finishData = new FormData();
-                finishData.append('upload_id', uploadId);
-                finishData.append('filename', file.name);
-                finishData.append('total_chunks', totalChunks);
-                finishData.append('mime_type', file.type || 'application/octet-stream');
-                if (targetFolderId) finishData.append('parent_id', targetFolderId);
-
-                await fetch('/upload_finish', {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': csrfToken },
-                    body: finishData
-                });
-            },
-
-            uploadChunkXHR(file, index, chunkSize, totalChunks, uploadId, onProgress) {
-                return new Promise((resolve, reject) => {
-                    const start = index * chunkSize;
-                    const end = Math.min(start + chunkSize, file.size);
-                    const chunk = file.slice(start, end);
-
-                    const formData = new FormData();
-                    formData.append('chunk', chunk);
-                    formData.append('upload_id', uploadId);
-                    formData.append('chunk_index', index);
-                    formData.append('total_chunks', totalChunks);
-                    formData.append('filename', file.name);
-
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', '/upload_chunk', true);
-                    xhr.setRequestHeader('X-CSRFToken', csrfToken);
-
-                    xhr.upload.onprogress = (e) => {
-                        if (e.lengthComputable) onProgress(e.loaded);
-                    };
-
-                    xhr.onload = () => {
-                        if (xhr.status >= 200 && xhr.status < 300) resolve();
-                        else reject(new Error(`Chunk ${index} failed: ${xhr.status}`));
-                    };
-                    xhr.onerror = () => reject(new Error(`Chunk ${index} network error`));
-
-                    xhr.send(formData);
-                });
-            },
-
-            folderCache: {},
-            async ensureFolder(path, parentId) {
-                if (!path) return parentId;
-                if (this.folderCache[path]) return this.folderCache[path];
-
-                // Use a promise queue to prevent multiple calls for same folder
-                if (this.folderCreationQueue[path]) return await this.folderCreationQueue[path];
-
-                this.folderCreationQueue[path] = (async () => {
-                    const parts = path.split('/');
-                    const folderName = parts.pop();
-                    const parentPath = parts.join('/');
-                    const resolvedParentId = await this.ensureFolder(parentPath, parentId);
-
-                    const formData = new FormData();
-                    formData.append('name', folderName);
-                    if (resolvedParentId) formData.append('parent_id', resolvedParentId);
-
-                    const res = await fetch('/create_folder_ajax', {
-                        method: 'POST',
-                        headers: { 'X-CSRFToken': csrfToken },
-                        body: formData
-                    });
-                    const data = await res.json();
-                    this.folderCache[path] = data.folder_id;
-                    delete this.folderCreationQueue[path];
-                    return data.folder_id;
-                })();
-
-                return await this.folderCreationQueue[path];
-            },
-
-            logProgress(bytes) {
-                const now = Date.now();
-                this.progressLog.push({ time: now, bytes: this.uploadedBytes });
-                // Keep only last 5 seconds for calculation
-                const windowMs = 5000;
-                while (this.progressLog.length > 2 && this.progressLog[0].time < now - windowMs) {
-                    this.progressLog.shift();
-                }
-            },
-
-            updateUI(currentFile) {
-                if (this.progressLog.length < 2) return;
-
-                const now = Date.now();
-                const oldest = this.progressLog[0];
-                const newest = this.progressLog[this.progressLog.length - 1];
-
-                const timeDiff = (newest.time - oldest.time) / 1000;
-                const bytesDiff = newest.bytes - oldest.bytes;
-
-                const speedBps = timeDiff > 0.1 ? bytesDiff / timeDiff : 0;
-                const speed = speedBps > 1024 * 1024
-                    ? (speedBps / 1024 / 1024).toFixed(1) + ' MB/s'
-                    : (speedBps / 1024).toFixed(1) + ' KB/s';
-
-                const percent = Math.min(99, Math.round((this.uploadedBytes / this.totalBytes) * 100)) || 0;
-                GlobalUpload.updateProgress(
-                    percent,
-                    speed,
-                    `Uploading ${this.uploadedFilesCount + 1}/${this.totalFilesCount}`,
-                    currentFile
-                );
-            },
-
-            finish(rootName) {
-                this.isProcessing = false;
-                GlobalUpload.updateProgress(100, 'Done', 'Syncing Folder...', rootName);
-                Modal.countdown('Transfer Complete!', `Successfully processed ${this.totalFilesCount} files.`, 5, () => {
-                    window.location.reload();
-                });
-            }
-        };
-
-        function handleFileSelect(event) {
-            if (event.target.files.length) UploadManager.init(event.target.files, false);
-        }
-
-        async function handleFolderSelect(event) {
-            if (event.target.files.length) UploadManager.init(event.target.files, true);
-        }
-
-        // Keep handleFiles for drag and drop compatibility
-        async function handleFiles(files) {
-            UploadManager.init(files, false);
-        }
-
-        // Hide loading on page load
-        hideLoading();
-
-        // Register Service Worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js')
-                    .then(reg => console.log('SW Registered', reg))
-                    .catch(err => console.log('SW Fail', err));
-            });
-        }
-    </script>
-    {% endif %}
-    <!-- Language Switcher -->
-    <script src="{{ url_for('static', filename='i18n.js') }}?v=1"></script>
-</body>
-
-</html>
+</div>
+{% endblock %}

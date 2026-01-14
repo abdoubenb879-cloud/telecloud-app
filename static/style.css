@@ -1,28 +1,29 @@
 /* ================================================
-   CloudVault - Modern Design System v2.0
-   A premium, SaaS-grade UI framework
+   Khaznati (خزنتي) - Modern Design System v2.1
+   A premium, minimalist Algerian Cloud Storage
    ================================================ */
 
 /* ============= CSS Variables ============= */
 :root {
-    /* Primary Colors */
-    --primary: #6366f1;
-    --primary-light: #818cf8;
-    --primary-dark: #4f46e5;
-    --primary-glow: rgba(99, 102, 241, 0.4);
+    /* Primary Colors (Teal from Logo) */
+    --primary: #4a7c92;
+    --primary-light: #5d93ac;
+    --primary-dark: #375d6e;
+    --primary-glow: rgba(74, 124, 146, 0.3);
 
-    /* Accent Colors */
-    --accent: #8b5cf6;
-    --accent-light: #a78bfa;
+    /* Accent Colors (Green from Logo) */
+    --accent: #6bb44e;
+    --accent-light: #82c866;
+    --accent-dark: #538d3c;
 
     /* Semantic Colors */
-    --success: #22c55e;
-    --success-light: rgba(34, 197, 94, 0.15);
+    --success: #6bb44e;
+    --success-light: rgba(107, 180, 78, 0.1);
     --warning: #f59e0b;
-    --warning-light: rgba(245, 158, 11, 0.15);
+    --warning-light: rgba(245, 158, 11, 0.1);
     --danger: #ef4444;
-    --danger-light: rgba(239, 68, 68, 0.15);
-    --info: #0ea5e9;
+    --danger-light: rgba(239, 68, 68, 0.1);
+    --info: #4a7c92;
 
     /* Background Colors */
     --bg-primary: #09090b;

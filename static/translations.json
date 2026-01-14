@@ -11,7 +11,11 @@
         "trash": "Trash",
         "trash_ar": "سلة المهملات",
         "logout": "Logout",
-        "logout_ar": "تسجيل الخروج"
+        "logout_ar": "تسجيل الخروج",
+        "storage": "Storage",
+        "storage_ar": "التخزين",
+        "account": "Account",
+        "account_ar": "الحساب"
     },
     "dashboard": {
         "my_files": "My Files",

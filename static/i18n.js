@@ -137,6 +137,13 @@ document.addEventListener('DOMContentLoaded', () => {
     Translator.init();
 });
 
+// Re-apply translations after SPA navigation
+document.addEventListener('spa:navigated', () => {
+    if (Translator.translations) {
+        Translator.applyLanguage(Translator.currentLang);
+    }
+});
+
 // Export for use in other scripts
 window.Translator = Translator;
 window.t = (section, key) => Translator.t(section, key);

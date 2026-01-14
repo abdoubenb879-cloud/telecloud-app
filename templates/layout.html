@@ -1,0 +1,107 @@
+{% if not is_ajax %}
+<!DOCTYPE html>
+<html lang="{{ session.get('khaznati_lang', 'en') }}">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Khaznati - خزنتي{% endblock %} | Secure Cloud Storage</title>
+
+    <!-- Branding & Meta -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#4a7c92">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ range(1, 10000) | random }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='rtl.css') }}?v=1">
+    {% block extra_css %}{% endblock %}
+
+    <!-- Google Ads -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1726377663312980"
+        crossorigin="anonymous"></script>
+</head>
+
+<body class="{% if session.get('khaznati_lang') == 'ar' %}rtl{% endif %}">
+    <div id="navLoadingBar" class="global-progress-bar"></div>
+
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Khaznati" class="sidebar-logo"
+                    style="width: 40px; height: 40px;">
+                <span class="sidebar-brand brand-name">Khaznati</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title" data-i18n="nav.storage">Storage</div>
+                    <a href="/" class="nav-item {{ 'active' if request.path == '/' }}">
+                        <i class="fas fa-folder"></i>
+                        <span data-i18n="dashboard.my_files">My Files</span>
+                    </a>
+                    <a href="/trash" class="nav-item {{ 'active' if request.path == '/trash' }}">
+                        <i class="fas fa-trash-alt"></i>
+                        <span data-i18n="trash.title">Trash</span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title" data-i18n="nav.account">Account</div>
+                    <a href="/settings" class="nav-item {{ 'active' if request.path == '/settings' }}">
+                        <i class="fas fa-cog"></i>
+                        <span data-i18n="settings.title">Settings</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-card" onclick="toggleUserMenu()">
+                    <div class="user-avatar">{{ username[0]|upper if username else 'U' }}</div>
+                    <div class="user-info">
+                        <div class="user-name">{{ username }}</div>
+                    </div>
+                    <i class="fas fa-chevron-up user-chevron"></i>
+                </div>
+
+                <div class="dropdown-menu" id="userMenu" style="bottom: 100%; top: auto; margin-bottom: 8px;">
+                    <a href="/settings" class="dropdown-item">
+                        <i class="fas fa-cog"></i> <span data-i18n="settings.title">Settings</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="/logout" class="dropdown-item danger">
+                        <i class="fas fa-sign-out-alt"></i> <span data-i18n="nav.logout">Sign Out</span>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content" id="main-content-area">
+            {% endif %}
+
+            <div id="spa-content-container">
+                {% block content %}{% endblock %}
+            </div>
+
+            {% if not is_ajax %}
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='i18n.js') }}"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>
+{% endif %}

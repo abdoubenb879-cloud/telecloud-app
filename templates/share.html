@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Download {{ filename }} - CloudVault</title>
+    <title>Download {{ filename }} - Khaznati</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -17,131 +17,128 @@
             align-items: center;
             justify-content: center;
             padding: var(--space-6);
+            background: radial-gradient(circle at 50% 50%, rgba(74, 124, 146, 0.05) 0%, transparent 100%);
         }
 
         .share-card {
-            background: var(--bg-secondary);
+            background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: var(--radius-2xl);
             padding: var(--space-8);
-            max-width: 400px;
+            max-width: 440px;
             width: 100%;
             text-align: center;
+            box-shadow: var(--shadow-lg);
         }
 
         .share-logo {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: var(--space-3);
-            margin-bottom: var(--space-6);
+            margin-bottom: var(--space-8);
         }
 
         .share-logo img {
-            width: 48px;
-            height: 48px;
-            border-radius: var(--radius-md);
-        }
-
-        .share-logo span {
-            font-size: 1.25rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--primary-light), var(--accent));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            max-height: 80px;
+            width: auto;
         }
 
         .file-preview-large {
-            width: 100px;
-            height: 100px;
-            margin: 0 auto var(--space-5);
+            width: 120px;
+            height: 120px;
+            margin: 0 auto var(--space-6);
             background: var(--bg-tertiary);
-            border-radius: var(--radius-xl);
+            border-radius: var(--radius-2xl);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2.5rem;
+            font-size: 3.5rem;
             color: var(--primary);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border);
         }
 
         .file-info h2 {
-            font-size: 1.1rem;
+            font-size: 1.25rem;
             margin-bottom: var(--space-2);
-            word-break: break-word;
+            word-break: break-all;
+            color: var(--text-primary);
         }
 
         .file-size {
             color: var(--text-muted);
-            font-size: 0.9rem;
-            margin-bottom: var(--space-6);
+            font-size: 0.95rem;
+            margin-bottom: var(--space-8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
         .ad-container {
-            background: var(--bg-tertiary);
+            background: var(--glass);
             border: 1px dashed var(--border);
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-lg);
             padding: var(--space-4);
-            margin-bottom: var(--space-6);
+            margin-bottom: var(--space-8);
+            min-height: 100px;
         }
 
-        .ad-label {
-            font-size: 0.7rem;
-            color: var(--text-disabled);
-            margin-bottom: var(--space-2);
+        .badge-premium {
+            background: var(--primary-glow);
+            color: var(--primary-light);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
     </style>
 </head>
 
 <body>
     <div class="share-container">
-        <div class="share-card animate-slide-up">
+        <div class="share-card animate-fade-in">
             <div class="share-logo">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="CloudVault">
-                <span>CloudVault</span>
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Khaznati">
             </div>
 
-            <p class="text-secondary mb-6">Someone shared a file with you</p>
+            <p class="text-secondary mb-8" style="font-weight: 500;">Someone shared a folder or file with you</p>
 
             <div class="file-preview-large">
                 {% if is_folder %}
-                <i class="fas fa-folder" style="color: #fbbf24;"></i>
-                {% elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.webm',
-                '.mkv')) %}
+                <i class="fas fa-folder" style="color: var(--primary);"></i>
+                {% elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp')) %}
                 <img src="/thumbnail/{{ file_id }}" alt="{{ filename }}"
-                    style="width: 100%; height: 100%; object-fit: cover; border-radius: var(--radius-xl);"
+                    style="width: 100%; height: 100%; object-fit: cover;"
                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                <i class="fas fa-file-download" style="display:none;"></i>
+                <i class="fas fa-file-image" style="display:none;"></i>
                 {% else %}
-                <i class="fas fa-file-download"></i>
+                <i class="fas fa-file-alt"></i>
                 {% endif %}
             </div>
 
             <div class="file-info">
                 <h2>{{ filename }}</h2>
                 <p class="file-size">
-                    {% if is_folder %}
-                    <span class="badge badge-primary">FOLDER</span>
-                    {% else %}
-                    <span class="badge badge-primary">FILE</span>
+                    <span class="badge-premium">{{ 'FOLDER' if is_folder else 'FILE' }}</span>
+                    {% if not is_folder %}
+                    <span class="dot-separator">•</span>
                     {{ (file_size / (1024*1024))|round(2) }} MB
                     {% endif %}
                 </p>
             </div>
 
             <div class="ad-container">
-                <p class="ad-label">Sponsored</p>
+                <p class="text-tiny text-disabled mb-2">ADVERTISEMENT</p>
                 <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-1726377663312980"
                     data-ad-slot="2827162592" data-ad-format="auto" data-full-width-responsive="true"></ins>
                 <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
             </div>
 
-            <a href="{{ url_for('download_shared', token=token) }}" class="btn btn-primary btn-lg w-full"
-                style="text-decoration: none;">
-                <i class="fas fa-download"></i> Download {{ 'Folder' if is_folder else 'File' }}
+            <a href="{{ url_for('download_shared', token=token) }}" class="btn btn-primary btn-lg w-full">
+                <i class="fas fa-download mr-2"></i> Download Now
             </a>
 
-            <p class="text-muted mt-6" style="font-size: 0.8rem;">
-                Powered by CloudVault • Secure cloud storage
+            <p class="text-muted mt-8" style="font-size: 0.8rem;">
+                Powered by <strong>Khaznati</strong> • High speed cloud storage
             </p>
         </div>
     </div>

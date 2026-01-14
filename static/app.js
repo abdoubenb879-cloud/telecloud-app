@@ -84,11 +84,13 @@ async function navigateSPA(url, pushState = true) {
 
             if (navBar) {
                 navBar.style.width = '100%';
-                setTimeout(() => { navBar.style.width = '0'; }, 300);
+                setTimeout(() => {
+                    navBar.style.width = '0';
+                    navBar.classList.remove('active');
+                }, 400);
             }
 
             // Re-initialize any page-specific listeners if needed
-            // (Page specific logic should ideally be triggered by custom events)
             document.dispatchEvent(new CustomEvent('spa:navigated', { detail: { url } }));
 
         }, 250);
@@ -102,8 +104,13 @@ async function navigateSPA(url, pushState = true) {
 function updateActiveNavItem(url) {
     const path = new URL(url, window.location.origin).pathname;
     document.querySelectorAll('.nav-item').forEach(item => {
-        const itemPath = new URL(item.href, window.location.origin).pathname;
-        if (path === itemPath) {
+        const itemUrl = item.getAttribute('href');
+        if (!itemUrl) return;
+
+        const itemPath = new URL(itemUrl, window.location.origin).pathname;
+
+        // Match exact or parent
+        if (path === itemPath || (itemPath !== '/' && path.startsWith(itemPath))) {
             item.classList.add('active');
         } else {
             item.classList.remove('active');

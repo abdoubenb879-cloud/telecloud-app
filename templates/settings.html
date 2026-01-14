@@ -1,350 +1,99 @@
-{% if not is_ajax %}
-<!DOCTYPE html>
-<html lang="en">
+{% extends "layout.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - CloudVault</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ range(1, 10000) | random }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-</head>
+{% block title %}Settings{% endblock %}
 
-<body>
-    <div class="app-layout">
-        <!-- Sidebar -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="CloudVault" class="sidebar-logo"
-                    style="width: 40px; height: 40px;">
-                <span class="sidebar-brand">CloudVault</span>
-            </div>
+{% block content %}
+<!-- Header -->
+<header class="content-header">
+    <div class="content-title">
+        <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
+            <i class="fas fa-bars"></i>
+        </button>
+        <h2 data-i18n="settings.title">Settings</h2>
+    </div>
+</header>
 
-            <nav class="sidebar-nav">
-                <div class="nav-section">
-                    <div class="nav-section-title">Storage</div>
-                    <a href="/" class="nav-item">
-                        <i class="fas fa-folder"></i>
-                        <span>My Files</span>
-                    </a>
-                    <a href="/trash" class="nav-item">
-                        <i class="fas fa-trash-alt"></i>
-                        <span>Trash</span>
-                    </a>
-                </div>
-
-                <div class="nav-section">
-                    <div class="nav-section-title">Account</div>
-                    <a href="/settings" class="nav-item active">
-                        <i class="fas fa-cog"></i>
-                        <span>Settings</span>
-                    </a>
-                </div>
-            </nav>
-
-            <div class="sidebar-footer">
-                <div class="user-card" onclick="toggleUserMenu()">
-                    <div class="user-avatar">{{ username[0]|upper if username else 'U' }}</div>
-                    <div class="user-info">
-                        <div class="user-name">{{ username }}</div>
+<div class="content-body" id="spa-content" style="max-width: 800px; margin: 0 auto;">
+    <!-- Profile Section -->
+    <div class="card mb-6 animate-fade-in">
+        <div class="card-header border-b">
+            <h3 data-i18n="settings.account">Account Settings</h3>
+        </div>
+        <div class="card-body">
+            <div class="settings-list">
+                <!-- Username -->
+                <div class="settings-item">
+                    <div class="settings-info">
+                        <label data-i18n="auth.username">Username</label>
+                        <p class="text-secondary">{{ username }}</p>
                     </div>
-                    <i class="fas fa-chevron-up user-chevron"></i>
                 </div>
 
-                <div class="dropdown-menu" id="userMenu" style="bottom: 100%; top: auto; margin-bottom: 8px;">
-                    <a href="/settings" class="dropdown-item">
-                        <i class="fas fa-cog"></i> Settings
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    <a href="/logout" class="dropdown-item danger">
-                        <i class="fas fa-sign-out-alt"></i> Sign Out
-                    </a>
+                <!-- Language -->
+                <div class="settings-item">
+                    <div class="settings-info">
+                        <label data-i18n="settings.language">Language</label>
+                        <p class="text-secondary" id="currentLangDisplay">
+                            {{ 'Arabic (Algeria)' if session.get('khaznati_lang') == 'ar' else 'English' }}
+                        </p>
+                    </div>
+                    <button class="btn btn-ghost"
+                        onclick="Translator.setLanguage(Translator.currentLang === 'en' ? 'ar' : 'en'); location.reload();">
+                        <i class="fas fa-language"></i> Change
+                    </button>
+                </div>
+
+                <!-- Theme -->
+                <div class="settings-item">
+                    <div class="settings-info">
+                        <label data-i18n="settings.theme">Theme</label>
+                        <p class="text-secondary">System Default / Dark Mode</p>
+                    </div>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="darkModeToggle" checked disabled>
+                        <label for="darkModeToggle"></label>
+                    </div>
                 </div>
             </div>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content" id="main-content-area">
-            {% endif %}
-            <div id="spa-content-container">
-                <!-- Header -->
-                <header class="content-header">
-                    <div class="content-title">
-                        <button class="btn btn-icon btn-ghost mobile-menu-btn" onclick="toggleSidebar()">
-                            <i class="fas fa-bars"></i>
-                        </button>
-                        <h2><i class="fas fa-cog" style="color: var(--primary); margin-right: 12px;"></i> Settings</h2>
-                    </div>
-                </header>
-
-                <div class="content-body" id="spa-content" style="max-width: 600px; margin: 0 auto;">
-                    <!-- Account Profile Section -->
-                    <section class="card mb-6">
-                        <h3 class="mb-4">Account Profile</h3>
-
-                        <!-- Username -->
-                        <div class="settings-field mb-4" id="usernameField">
-                            <label class="text-secondary"
-                                style="font-size: 0.85rem; display: block; margin-bottom: 4px;">Username</label>
-                            <div class="settings-value-row">
-                                <span class="settings-value" id="usernameValue">{{ username }}</span>
-                                <button class="btn btn-sm btn-ghost" onclick="editField('username')">
-                                    <i class="fas fa-pen"></i> Edit
-                                </button>
-                            </div>
-                            <div class="settings-edit-row hidden" id="usernameEditRow">
-                                <input type="text" id="usernameInput" class="form-input" value="{{ username }}"
-                                    placeholder="New username">
-                                <div class="flex gap-2 mt-2">
-                                    <button class="btn btn-primary" onclick="saveField('username')">Save</button>
-                                    <button class="btn btn-secondary" onclick="cancelEdit('username')">Cancel</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Email -->
-                        <div class="settings-field mb-4" id="emailField">
-                            <label class="text-secondary"
-                                style="font-size: 0.85rem; display: block; margin-bottom: 4px;">Email Address</label>
-                            <div class="settings-value-row">
-                                <span class="settings-value" id="emailValue">{{ email }}</span>
-                                <button class="btn btn-sm btn-ghost" onclick="editField('email')">
-                                    <i class="fas fa-pen"></i> Edit
-                                </button>
-                            </div>
-                            <div class="settings-edit-row hidden" id="emailEditRow">
-                                <input type="email" id="emailInput" class="form-input" value="{{ email }}"
-                                    placeholder="New email">
-                                <div class="flex gap-2 mt-2">
-                                    <button class="btn btn-primary" onclick="saveField('email')">Save</button>
-                                    <button class="btn btn-secondary" onclick="cancelEdit('email')">Cancel</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Password -->
-                        <div class="settings-field" id="passwordField">
-                            <label class="text-secondary"
-                                style="font-size: 0.85rem; display: block; margin-bottom: 4px;">Password</label>
-                            <div class="settings-value-row">
-                                <span class="settings-value" style="color: var(--text-muted);">••••••••</span>
-                                <button class="btn btn-sm btn-ghost" onclick="editField('password')">
-                                    <i class="fas fa-key"></i> Change
-                                </button>
-                            </div>
-                            <div class="settings-edit-row hidden" id="passwordEditRow">
-                                <input type="password" id="oldPasswordInput" class="form-input mb-2"
-                                    placeholder="Current password">
-                                <input type="password" id="passwordInput" class="form-input"
-                                    placeholder="New password (min 8 characters)">
-                                <div class="flex gap-2 mt-2 items-center">
-                                    <button class="btn btn-primary" onclick="saveField('password')">Update
-                                        Password</button>
-                                    <button class="btn btn-secondary" onclick="cancelEdit('password')">Cancel</button>
-                                </div>
-                                <a href="/forgot-password" class="text-sm text-primary mt-2"
-                                    style="display: inline-block;">Forgot your password?</a>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- Storage Maintenance Section -->
-                    <section class="card mb-6">
-                        <h3 class="mb-2"><i class="fas fa-broom"
-                                style="color: var(--primary); margin-right: 8px;"></i>Storage Maintenance</h3>
-                        <p class="text-secondary mb-4" style="font-size: 0.9rem;">
-                            Clean up files that failed to upload (have 0 chunks stored in Telegram).
-                            These files appear in your list but cannot be downloaded.
-                        </p>
-                        <div class="settings-value-row">
-                            <span class="text-secondary" id="orphanedCount">Checking...</span>
-                            <button class="btn btn-warning" id="cleanupBtn" onclick="cleanupOrphanedFiles()">
-                                <i class="fas fa-trash-alt"></i> Clean Up Failed Uploads
-                            </button>
-                        </div>
-                    </section>
-
-                    <!-- Danger Zone -->
-                    <section class="card" style="border-color: var(--danger-subtle);">
-                        <h3 class="mb-2 text-danger">Danger Zone</h3>
-                        <p class="text-secondary mb-4" style="font-size: 0.9rem;">
-                            Once you delete your account, there is no going back. All your files will be permanently
-                            deleted.
-                        </p>
-                        <button class="btn btn-danger" onclick="deleteAccount()">
-                            <i class="fas fa-trash"></i> Delete Account
-                        </button>
-                    </section>
-                </div>
-
-                <!-- Orphaned files cleanup script - inside spa-content so it loads on AJAX nav -->
-                <script>
-                    // Check for orphaned files on page load
-                    (function () {
-                        checkOrphanedFiles();
-                    })();
-
-                    async function checkOrphanedFiles() {
-                        try {
-                            const response = await fetch('/orphaned_files');
-                            const data = await response.json();
-
-                            const countEl = document.getElementById('orphanedCount');
-                            const btnEl = document.getElementById('cleanupBtn');
-
-                            if (!countEl || !btnEl) return;
-
-                            if (data.count > 0) {
-                                countEl.textContent = `Found ${data.count} failed upload(s)`;
-                                countEl.style.color = 'var(--warning)';
-                                btnEl.disabled = false;
-                            } else {
-                                countEl.textContent = 'No failed uploads found ✓';
-                                countEl.style.color = 'var(--success)';
-                                btnEl.disabled = true;
-                                btnEl.innerHTML = '<i class="fas fa-check"></i> All Clean!';
-                            }
-                        } catch (e) {
-                            console.error('Failed to check orphaned files:', e);
-                            const countEl = document.getElementById('orphanedCount');
-                            if (countEl) countEl.textContent = 'Unable to check';
-                        }
-                    }
-
-                    async function cleanupOrphanedFiles() {
-                        const btn = document.getElementById('cleanupBtn');
-                        const originalText = btn.innerHTML;
-
-                        if (!confirm('This will permanently delete files that failed to upload. You can re-upload them afterwards. Continue?')) {
-                            return;
-                        }
-
-                        btn.disabled = true;
-                        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cleaning...';
-
-                        try {
-                            const response = await fetch('/cleanup_orphaned', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                                }
-                            });
-
-                            const data = await response.json();
-
-                            if (data.status === 'success') {
-                                if (typeof showToast === 'function') {
-                                    showToast(`Cleaned up ${data.deleted} failed uploads. You can now re-upload them.`);
-                                } else {
-                                    alert(`Cleaned up ${data.deleted} failed uploads. You can now re-upload them.`);
-                                }
-                                // Refresh the count
-                                checkOrphanedFiles();
-                            } else {
-                                if (typeof showToast === 'function') {
-                                    showToast(data.error || 'Cleanup failed', 'error');
-                                } else {
-                                    alert(data.error || 'Cleanup failed');
-                                }
-                                btn.innerHTML = originalText;
-                                btn.disabled = false;
-                            }
-                        } catch (e) {
-                            if (typeof showToast === 'function') {
-                                showToast('Cleanup failed: ' + e.message, 'error');
-                            } else {
-                                alert('Cleanup failed: ' + e.message);
-                            }
-                            btn.innerHTML = originalText;
-                            btn.disabled = false;
-                        }
-                    }
-                </script>
-            </div> <!-- End spa-content-container -->
-            {% if not is_ajax %}
-        </main>
+        </div>
     </div>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="toast hidden">
-        <span id="toastMsg"></span>
+    <!-- Security Section -->
+    <div class="card mb-6 animate-fade-in" style="animation-delay: 0.1s;">
+        <div class="card-header border-b">
+            <h3 data-i18n="settings.security">Security</h3>
+        </div>
+        <div class="card-body">
+            <button class="btn btn-ghost danger w-full justify-start" onclick="deleteAccount()">
+                <i class="fas fa-user-slash mr-2"></i> <span data-i18n="settings.delete_account">Delete Account</span>
+            </button>
+        </div>
     </div>
 
-    <!-- Navigation Loading Bar -->
-    <div id="navLoadingBar" class="nav-loading-bar"></div>
+    <!-- App Information -->
+    <div class="text-center text-muted" style="font-size: 0.8rem;">
+        <p>Khaznati v2.1.0-minimalist</p>
+        <p data-i18n="footer.made_in">Made with ❤️ in Algeria</p>
+    </div>
+</div>
 
-    <style>
-        .settings-field {
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border);
+<script>
+    async function deleteAccount() {
+        if (!confirm('Are you sure you want to delete your account? This action is permanent and all your files will be lost.')) {
+            return;
         }
 
-        .settings-field:last-child {
-            border-bottom: none;
-        }
-
-        .settings-value-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .settings-value {
-            font-size: 1rem;
-            color: var(--text-primary);
-        }
-
-        .settings-edit-row {
-            margin-top: 12px;
-        }
-
-        .settings-edit-row.hidden {
-            display: none;
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 12px 24px;
-            border-radius: var(--radius-md);
-            background: var(--bg-card);
-            color: var(--text-primary);
-            border: 1px solid var(--success);
-            box-shadow: var(--shadow-lg);
-            z-index: 1000;
-            animation: slideIn 0.3s ease;
-        }
-
-        .toast.hidden {
-            display: none;
-        }
-
-        .toast.error {
-            border-color: var(--danger);
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
+        try {
+            const response = await fetch('/delete-account', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content }
+            });
+            if (response.ok) {
+                window.location.href = '/logout';
+            } else {
+                alert('Failed to delete account');
             }
-
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-    </style>
-
-    <script src="{{ url_for('static', filename='modal.js') }}?v=5"></script>
-    <script src="{{ url_for('static', filename='app.js') }}?v={{ range(1, 10000) | random }}"></script>
-    {% endif %}
-</body>
-
-</html>
+        } catch (e) { console.error(e); }
+    }
+</script>
+{% endblock %}

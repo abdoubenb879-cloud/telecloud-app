@@ -266,8 +266,19 @@ class BotClient:
     
     def _run_async(self, coro):
         """Run async operation in the background loop."""
+        print(f"[BOT._run_async] Loop: {_loop}, Running: {_loop.is_running() if _loop else 'N/A'}, Closed: {_loop.is_closed() if _loop else 'N/A'}")
+        print(f"[BOT._run_async] Loop thread alive: {_loop_thread.is_alive() if _loop_thread else 'N/A'}")
         future = asyncio.run_coroutine_threadsafe(coro, _loop)
-        return future.result(timeout=6000)
+        print(f"[BOT._run_async] Future created: {future}, waiting for result...")
+        try:
+            result = future.result(timeout=120)  # Reduced timeout to 2 minutes
+            print(f"[BOT._run_async] Got result: {type(result)}")
+            return result
+        except Exception as e:
+            print(f"[BOT._run_async] ERROR: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
     
     def connect(self):
         """Start the bot client (thread-safe)."""

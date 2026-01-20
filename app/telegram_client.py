@@ -14,7 +14,7 @@ _loop_ready = threading.Event()
 _loop_lock = threading.Lock()
 
 def ensure_loop_running():
-    global _loop, _loop_thread
+    global _loop, _loop_thread, _bot_instance
     
     # Quick check without lock
     if _loop_thread is not None and _loop_thread.is_alive() and _loop is not None:
@@ -27,13 +27,20 @@ def ensure_loop_running():
             return _loop
         
         # Reset state if thread died or never started
+        print("[LOOP] Event loop thread died or not started, creating new one...")
         _loop_ready.clear()
+        
+        # CRITICAL: Reset the bot instance so it recreates with new loop
+        # Reset both the global variable and the class singleton
+        _bot_instance = None
+        # We'll reset the class singleton after it's defined (see bottom of file)
         
         def run_loop():
             global _loop
             _loop = asyncio.new_event_loop()
             asyncio.set_event_loop(_loop)
             _loop_ready.set()
+            print("[LOOP] New event loop started, running forever...")
             _loop.run_forever()
             
         _loop_thread = threading.Thread(target=run_loop, name="TeleCloudLoop", daemon=True)
@@ -43,6 +50,7 @@ def ensure_loop_running():
         if not _loop_ready.wait(timeout=30):
             raise RuntimeError("Failed to start event loop thread")
         
+        print(f"[LOOP] Event loop thread started successfully: {_loop_thread}")
         return _loop
 
 class TelegramCloud:
@@ -411,8 +419,17 @@ class BotClient:
 _bot_instance = None
 
 def get_bot_client():
-    """Get the global bot client instance."""
+    """Get the global bot client instance. Recreates if loop thread died."""
     global _bot_instance
+    
+    # Check if we need to recreate the bot (loop thread died)
+    if _bot_instance is not None:
+        if _loop_thread is None or not _loop_thread.is_alive():
+            print("[BOT] Loop thread died, resetting bot instance...")
+            _bot_instance = None
+            BotClient._instance = None  # Reset class singleton too
+    
     if _bot_instance is None:
+        print("[BOT] Creating new BotClient instance...")
         _bot_instance = BotClient()
     return _bot_instance

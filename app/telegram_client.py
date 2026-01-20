@@ -266,12 +266,14 @@ class BotClient:
     
     def _run_async(self, coro):
         """Run async operation in the background loop."""
-        print(f"[BOT._run_async] Loop: {_loop}, Running: {_loop.is_running() if _loop else 'N/A'}, Closed: {_loop.is_closed() if _loop else 'N/A'}")
+        # CRITICAL: Ensure loop thread is alive before submitting work
+        loop = ensure_loop_running()
+        print(f"[BOT._run_async] Loop: {loop}, Running: {loop.is_running()}, Closed: {loop.is_closed()}")
         print(f"[BOT._run_async] Loop thread alive: {_loop_thread.is_alive() if _loop_thread else 'N/A'}")
-        future = asyncio.run_coroutine_threadsafe(coro, _loop)
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
         print(f"[BOT._run_async] Future created: {future}, waiting for result...")
         try:
-            result = future.result(timeout=120)  # Reduced timeout to 2 minutes
+            result = future.result(timeout=120)  # 2 minutes timeout
             print(f"[BOT._run_async] Got result: {type(result)}")
             return result
         except Exception as e:

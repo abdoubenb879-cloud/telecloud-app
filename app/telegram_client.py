@@ -360,23 +360,38 @@ class BotClient:
     def upload_chunks_parallel(self, chunk_paths, max_concurrent=3):
         """Upload multiple chunks in parallel to Telegram."""
         target = self.channel_id
+        print(f"[UPLOAD] Starting parallel upload to channel {target}, {len(chunk_paths)} chunks")
         
         async def upload_single(cp):
-            return await self.client.send_document(
-                target,
-                document=cp,
-                file_name=os.path.basename(cp)
-            )
+            print(f"[UPLOAD] Uploading chunk: {cp}")
+            try:
+                result = await self.client.send_document(
+                    target,
+                    document=cp,
+                    file_name=os.path.basename(cp)
+                )
+                print(f"[UPLOAD] Chunk uploaded successfully: {cp} -> msg_id={result.id if result else 'None'}")
+                return result
+            except Exception as e:
+                print(f"[UPLOAD] Chunk upload FAILED: {cp} -> {e}")
+                raise
         
         async def work():
+            print(f"[UPLOAD] Inside async work(), processing {len(chunk_paths)} chunks")
             results = []
             for i in range(0, len(chunk_paths), max_concurrent):
                 batch = chunk_paths[i:i + max_concurrent]
+                print(f"[UPLOAD] Processing batch {i//max_concurrent + 1}: {batch}")
                 batch_results = await asyncio.gather(*[upload_single(cp) for cp in batch])
                 results.extend(batch_results)
+                print(f"[UPLOAD] Batch complete, got {len(batch_results)} results")
+            print(f"[UPLOAD] All chunks done, returning {len(results)} results")
             return results
-            
-        return self._run_async(work())
+        
+        print(f"[UPLOAD] Submitting async work to loop...")
+        result = self._run_async(work())
+        print(f"[UPLOAD] Async work completed, got result: {result}")
+        return result
 
 
 # Global bot instance (lazy initialization)

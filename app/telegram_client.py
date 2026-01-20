@@ -242,8 +242,6 @@ class BotClient:
     def __init__(self):
         if self._initialized:
             return
-            
-        ensure_loop_running()
         
         self.bot_token = Config.BOT_TOKEN
         self.channel_id = Config.STORAGE_CHANNEL_ID
@@ -255,7 +253,7 @@ class BotClient:
         if not self.channel_id:
             raise ValueError("STORAGE_CHANNEL_ID is required for Bot mode")
         
-        # Create bot client
+        # Create bot client synchronously
         async def create_bot():
             return Client(
                 "telecloud_bot",
@@ -266,22 +264,21 @@ class BotClient:
                 no_updates=True
             )
         
-        future = asyncio.run_coroutine_threadsafe(create_bot(), _loop)
-        self.client = future.result(timeout=30)
+        self.client = asyncio.run(create_bot())
         self._connected = False
         self._initialized = True
         print("[BOT] BotClient initialized successfully")
     
     def _run_async(self, coro):
-        """Run async operation in the background loop."""
-        # CRITICAL: Ensure loop thread is alive before submitting work
-        loop = ensure_loop_running()
-        print(f"[BOT._run_async] Loop: {loop}, Running: {loop.is_running()}, Closed: {loop.is_closed()}")
-        print(f"[BOT._run_async] Loop thread alive: {_loop_thread.is_alive() if _loop_thread else 'N/A'}")
-        future = asyncio.run_coroutine_threadsafe(coro, loop)
-        print(f"[BOT._run_async] Future created: {future}, waiting for result...")
+        """Run async operation synchronously using asyncio.run().
+        
+        This creates a fresh event loop for each operation, which is more
+        reliable than maintaining a persistent daemon thread that can die.
+        """
+        print(f"[BOT._run_async] Running async operation with asyncio.run()...")
         try:
-            result = future.result(timeout=120)  # 2 minutes timeout
+            # Use asyncio.run() which creates a fresh loop, runs to completion, then cleans up
+            result = asyncio.run(coro)
             print(f"[BOT._run_async] Got result: {type(result)}")
             return result
         except Exception as e:
@@ -419,16 +416,8 @@ class BotClient:
 _bot_instance = None
 
 def get_bot_client():
-    """Get the global bot client instance. Recreates if loop thread died."""
+    """Get the global bot client instance."""
     global _bot_instance
-    
-    # Check if we need to recreate the bot (loop thread died)
-    if _bot_instance is not None:
-        if _loop_thread is None or not _loop_thread.is_alive():
-            print("[BOT] Loop thread died, resetting bot instance...")
-            _bot_instance = None
-            BotClient._instance = None  # Reset class singleton too
-    
     if _bot_instance is None:
         print("[BOT] Creating new BotClient instance...")
         _bot_instance = BotClient()

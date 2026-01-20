@@ -1452,9 +1452,12 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
                     print(f"[BG] Video thumbnail failed: {ve}")
 
         try:
+            print(f"[BG] About to connect bot...")
             bot.connect()
+            print(f"[BG] Bot connected! Starting parallel upload of {len(chunk_paths)} chunks...")
             # NEW: Upload chunks in parallel to Telegram (3x speedup)
             uploaded_messages = bot.upload_chunks_parallel(chunk_paths, max_concurrent=3)
+            print(f"[BG] Upload complete! Got {len(uploaded_messages) if uploaded_messages else 0} messages")
             
             # Filter and store in DB
             for idx, msg in enumerate(uploaded_messages):
@@ -1472,6 +1475,8 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
 
         except Exception as ue:
             print(f"[BG] Upload error: {ue}")
+            import traceback as tb
+            tb.print_exc()
             # db.update_file_status(file_id, "error")  # TODO: Add status column to Supabase schema
             raise
         finally:

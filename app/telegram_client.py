@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+import time
 import threading
 # Apply patch before importing Client
 import app.pyrogram_patch

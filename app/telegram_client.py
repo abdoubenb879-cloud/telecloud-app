@@ -69,17 +69,21 @@ class PersistentBotClient:
         )
         self.is_connected = False
         self._async = get_async_thread()
+        self._connect_lock = threading.Lock()
 
     async def start(self):
-        if not self.is_connected:
-            try:
-                print(f"[BOT-{self.name}] Connecting (IPv4 forced)...")
-                await self.client.start()
-                self.is_connected = True
-                print(f"[BOT-{self.name}] Connection established!")
-            except Exception as e:
-                print(f"[BOT-{self.name}] CONNECTION FAILED: {e}")
-                raise
+        if self.is_connected:
+            return
+            
+        try:
+            print(f"[BOT-{self.name}] Connecting (IPv4 forced)...")
+            await self.client.start()
+            self.is_connected = True
+            print(f"[BOT-{self.name}] Connection established!")
+        except Exception as e:
+            print(f"[BOT-{self.name}] CONNECTION FAILED: {e}")
+            self.is_connected = False
+            # Don't raise here, allow retries later
 
     async def stop(self):
         if self.is_connected:
@@ -88,6 +92,13 @@ class PersistentBotClient:
 
     def run_sync(self, coro, timeout=300):
         """Run an async method of THIS client in the async thread."""
+        # Ensure connected before running
+        if not self.is_connected:
+            try:
+                self._async.run_coro(self.start()).result(timeout=60)
+            except Exception as e:
+                print(f"[BOT-{self.name}] Warning: Connection attempt timed out: {e}")
+            
         future = self._async.run_coro(coro)
         return future.result(timeout=timeout)
 
@@ -133,16 +144,27 @@ class BotPool:
             
         print(f"[POOL] Created pool with {len(self.bots)} bots")
 
-    def connect(self):
-        """Connect ALL bots in the pool. Call this at startup."""
-        print(f"[POOL] Connecting {len(self.bots)} bots sequentially...")
-        for bot in self.bots:
-            try:
-                get_async_thread().run_coro(bot.start()).result(timeout=60)
-            except Exception as e:
-                print(f"[POOL] Warning: Could not connect bot {bot.name}: {e}")
+    def connect(self, wait=False):
+        """
+        Connect ALL bots in the pool. 
+        wait=False (default) makes it non-blocking for web startup.
+        """
+        print(f"[POOL] Initiating connection for {len(self.bots)} bots...")
+        
+        def _bg_connect():
+            for bot in self.bots:
+                try:
+                    get_async_thread().run_coro(bot.start()).result(timeout=60)
+                except Exception as e:
+                    print(f"[POOL] Background connect warning for {bot.name}: {e}")
+            print(f"[POOL] Background connection phase complete.")
+
+        t = threading.Thread(target=_bg_connect, daemon=True)
+        t.start()
+        
+        if wait:
+            t.join(timeout=60)
             
-        print(f"[POOL] Pool ready! Connected bots: {[b.name for b in self.bots if b.is_connected]}")
         return self
 
     def _get_next_bot(self):

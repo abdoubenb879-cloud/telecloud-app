@@ -1452,9 +1452,7 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
                     print(f"[BG] Video thumbnail failed: {ve}")
 
         try:
-            print("[BG] Connecting to Telegram Bot...")
-            bot.connect()
-            print("[BG] Bot Connected. Starting parallel upload...")
+            print("[BG] Starting parallel upload...")
             
             # NEW: Upload chunks in parallel to Telegram (3x speedup)
             uploaded_messages = bot.upload_chunks_parallel(chunk_paths, max_concurrent=3)
@@ -1810,7 +1808,6 @@ def download_shared(token):
         output_path = os.path.join(Config.DOWNLOAD_DIR, safe_filename)
         
         downloaded_chunks = []
-        bot.connect()
         try:
             for chunk in chunks:
                 msg_id = chunk['message_id']
@@ -1846,12 +1843,12 @@ def download_shared(token):
 os.makedirs(Config.UPLOAD_DIR, exist_ok=True)
 os.makedirs(Config.DOWNLOAD_DIR, exist_ok=True)
 
-# Pre-connect the bot at startup to avoid race conditions during first uploads
-print("[INIT] Pre-connecting bot client...")
+# Pre-init the bot pool (connections will happen in background)
+print("[INIT] Initializing bot pool...")
 try:
     bot = get_bot_client()
-    bot.connect()
-    print("[INIT] Bot client connected and ready for uploads!")
+    bot.connect(wait=False)
+    print("[INIT] Bot pool initialized! (Connecting in background)")
 except Exception as e:
     print(f"[INIT] WARNING: Bot pre-connection failed: {e}")
     print("[INIT] Bot will attempt to connect on first upload request.")

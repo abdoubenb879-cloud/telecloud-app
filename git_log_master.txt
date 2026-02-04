@@ -1,0 +1,15 @@
+﻿9470423 Fix shared folder download and unify database interface
+b5b69a3 Fix Trash UI: Resolve click interception by pseudo-elements and improve button reliability
+7a91840 Implement Bulk Move feature: Add Move button to selection bar, folder picker modal, and backend move routes
+b8e59f2 Fix Trash functionality: Remove duplicate routes, add auth checks, and consolidate logic
+645b065 Fix duplicate route crash and consolidate folder sharing into persistent DB system
+fdb2fd5 Clean up mangled JS and fix syntax error in dashboard
+aa0d85e Add folder sharing with shareable links and download page
+8bdf824 Add folder download feature with recursive ZIP creation
+b2a86e0 Fix corrupted JavaScript in handleFiles function
+061878f Add multi-select mode with bulk download as ZIP
+40df4b7 Add animated success screen and comprehensive Android/mobile fixes
+da35d11 Add nice confirmation modal for folder upload with file count and size
+29de27f Add folder upload feature with recursive folder creation and progress tracking
+39653a1 Fix: Add requirements.txt to repo
+79e40f7 Add rename route and SendGrid email

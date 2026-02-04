@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - CloudVault</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1726377663312980"
+        crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <div class="auth-container">
+        <div class="auth-card animate-slide-up">
+            <div class="auth-header">
+                <img src="/static/logo.png" alt="CloudVault" class="auth-logo">
+                <h1 class="auth-title">Welcome back</h1>
+                <p class="auth-subtitle">Sign in to access your cloud storage</p>
+            </div>
+
+            
+
+            
+
+            <div class="auth-tabs">
+                <div class="auth-tab active" onclick="showPanel('login')">Sign In</div>
+                <div class="auth-tab" onclick="showPanel('register')">Sign Up</div>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-panel" class="auth-form" action="/login" method="POST">
+                <input type="hidden" name="csrf_token" value="ImY2ZDkzYWMxMzAxYTE3YWM1YmQ1NTY3OWIwY2ZjYWYwZmE2OTUwZDgi.aYKfUw.5Kb_EeVrg8jhsEodmPOmLMCT7Zk">
+
+                <div class="form-group">
+                    <label class="form-label" for="login_email">Email or Username</label>
+                    <input type="text" name="email" id="login_email" class="form-input"
+                        placeholder="you@example.com or username" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="login_password">Password</label>
+                    <input type="password" name="password" id="login_password" class="form-input" placeholder="••••••••"
+                        required>
+                </div>
+
+                <div class="flex justify-between items-center mb-4">
+                    <label class="flex items-center gap-2 text-secondary" style="font-size: 0.85rem; cursor: pointer;">
+                        <input type="checkbox" name="remember"
+                            style="width: 16px; height: 16px; accent-color: var(--primary);">
+                        Remember me
+                    </label>
+                    <a href="/forgot-password" style="font-size: 0.85rem;">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg w-full">
+                    Sign In <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-panel" class="auth-form hidden" action="/register" method="POST">
+                <input type="hidden" name="csrf_token" value="ImY2ZDkzYWMxMzAxYTE3YWM1YmQ1NTY3OWIwY2ZjYWYwZmE2OTUwZDgi.aYKfUw.5Kb_EeVrg8jhsEodmPOmLMCT7Zk">
+
+                <div class="form-group">
+                    <label class="form-label" for="reg_name">Full Name</label>
+                    <input type="text" name="name" id="reg_name" class="form-input" placeholder="John Doe" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="reg_email">Email Address</label>
+                    <input type="email" name="email" id="reg_email" class="form-input" placeholder="you@example.com"
+                        required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="reg_password">Password</label>
+                    <input type="password" name="password" id="reg_password" class="form-input"
+                        placeholder="Min. 8 characters" required minlength="8">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="reg_confirm">Confirm Password</label>
+                    <input type="password" name="confirm_password" id="reg_confirm" class="form-input"
+                        placeholder="••••••••" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg w-full">
+                    Create Account <i class="fas fa-user-plus"></i>
+                </button>
+            </form>
+
+            <div class="auth-footer">
+                <p>By continuing, you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showPanel(panel) {
+            const tabs = document.querySelectorAll('.auth-tab');
+            const loginPanel = document.getElementById('login-panel');
+            const registerPanel = document.getElementById('register-panel');
+
+            tabs.forEach((tab, i) => {
+                tab.classList.toggle('active', (panel === 'login' && i === 0) || (panel === 'register' && i === 1));
+            });
+
+            loginPanel.classList.toggle('hidden', panel !== 'login');
+            registerPanel.classList.toggle('hidden', panel !== 'register');
+
+            // Toggle required attributes to prevent validation conflicts
+            loginPanel.querySelectorAll('input[type="text"], input[type="password"], input[type="email"]').forEach(inp => {
+                inp.required = (panel === 'login');
+            });
+            registerPanel.querySelectorAll('input[type="text"], input[type="password"], input[type="email"]').forEach(inp => {
+                inp.required = (panel === 'register');
+            });
+        }
+    </script>
+</body>
+
+</html>

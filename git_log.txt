@@ -1,0 +1,55 @@
+﻿b34e043 Fix: Add missing 'time' import for unique session names
+f453b4a Fix: Use unique sessions, context manager, and timeouts for upload
+bc700a9 Fix: Create fresh Pyrogram client within upload async context
+131256e Switch to asyncio.run() for each operation instead of persistent loop thread
+9e86df0 Fix: Reset BotClient singleton when loop thread dies to recreate with new loop
+058e517 Fix: Call ensure_loop_running in _run_async to restart dead thread
+8630bde Add event loop state debugging to _run_async
+fada4dd Add detailed debug logging to upload_chunks_parallel
+e9905e6 Add debug logging to trace Telegram upload failure
+d5915b8 Fix: Thread-safe bot connection to prevent FloodWait
+e76694f Fix: Remove non-existent update_file_status calls
+f249443 UX: Better error message for files still processing
+16d3824 Fix: Return 404 for missing thumbnails to trigger fallback icons
+c7c6a4e Fix: getFileIcon undefined error in Jinja templates
+2566604 Feature: Visual thumbnails for images and videos
+5d92f38 UX: Mandatory success countdown & auto-refresh on upload completion
+05a9269 Fix: Server-side idempotent folder creation to prevent duplicates
+8c652eb Performance: Lightning Speed v2  - Precision XHR tracking & optimized concurrency
+f0eea40 Performance: Implement HighSpeedUploadQueue with 20MB chunks and 8x concurrency
+2669642 Fix: Restore parallel download/upload logic and resolve file preview bug
+f3a7e57 Performance: Implement high-speed parallel uploads and batch downloads
+6711706 Fix: Implement bulk move files functionality and fix 404 error
+c29c415 UI: Fix sticky selection bar by removing breaking overflow-x properties
+cc2a2bc UI: Fix sticky selection bar and stabilize header heights
+efa67f0 UI: Make selection bar sticky with glassmorphism effect
+b612159 Perf: Add gzip compression, parallel downloads, extended caching
+fe3a38c Fix: Shared folder download now creates ZIP properly
+7e48dd8 Fix: Remove thumbnail field from add_file - column doesn't exist in Supabase
+84ad058 Fix: Folder download 0 bytes issue, improve upload modal symmetry
+d88d5f7 Fix: Upload thread crash, Sequential downloads, and UI checkmark glitches
+5f41a5b Refactor: Centralize JS logic in app.js to fix SPA ReferenceErrors
+fa20c65 Fix SPA navigation and layout bugs on trash and settings pages
+4f41cb4 Fix thumbnail KeyError for databases without thumbnail column
+aeee0bf debug: add logging to shared folder download
+e0433c1 fix: return transparent PNG instead of 404 for missing thumbnails
+c04b860 fix: settings.html unclosed Jinja block
+d09d459 fix: trash.html unbalanced Jinja blocks
+f3606a1 hotfix: add second missing endif for modal block
+58e15cc hotfix: add missing endif for AJAX block
+9d77840 fix: SPA stability, thumbnail 404s, and UI glitches
+9470423 Fix shared folder download and unify database interface
+b5b69a3 Fix Trash UI: Resolve click interception by pseudo-elements and improve button reliability
+7a91840 Implement Bulk Move feature: Add Move button to selection bar, folder picker modal, and backend move routes
+b8e59f2 Fix Trash functionality: Remove duplicate routes, add auth checks, and consolidate logic
+645b065 Fix duplicate route crash and consolidate folder sharing into persistent DB system
+fdb2fd5 Clean up mangled JS and fix syntax error in dashboard
+aa0d85e Add folder sharing with shareable links and download page
+8bdf824 Add folder download feature with recursive ZIP creation
+b2a86e0 Fix corrupted JavaScript in handleFiles function
+061878f Add multi-select mode with bulk download as ZIP
+40df4b7 Add animated success screen and comprehensive Android/mobile fixes
+da35d11 Add nice confirmation modal for folder upload with file count and size
+29de27f Add folder upload feature with recursive folder creation and progress tracking
+39653a1 Fix: Add requirements.txt to repo
+79e40f7 Add rename route and SendGrid email

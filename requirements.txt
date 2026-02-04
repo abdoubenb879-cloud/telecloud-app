@@ -48,3 +48,4 @@ gunicorn
 gevent
 Flask-WTF>=1.2.0
 bleach>=6.0.0
+nest_asyncio>=1.6.0

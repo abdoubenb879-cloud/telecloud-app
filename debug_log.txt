@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "C:\Users\abdou1\.gemini\antigravity\scratch\telegram-cloud\debug_final.py", line 15, in main
+    async with Client("debug_final", api_id=os.getenv("API_ID"), api_hash=os.getenv("API_HASH"), bot_token=os.getenv("BOT_TOKEN"), in_memory=True) as app:
+  File "C:\Users\abdou1\AppData\Local\Programs\Python\Python310\lib\site-packages\pyrogram\client.py", line 311, in __aenter__
+    return await self.start()
+  File "C:\Users\abdou1\AppData\Local\Programs\Python\Python310\lib\site-packages\pyrogram\methods\utilities\start.py", line 62, in start
+    await self.authorize()
+  File "C:\Users\abdou1\AppData\Local\Programs\Python\Python310\lib\site-packages\pyrogram\client.py", line 333, in authorize
+    return await self.sign_in_bot(self.bot_token)
+  File "C:\Users\abdou1\AppData\Local\Programs\Python\Python310\lib\site-packages\pyrogram\methods\auth\sign_in_bot.py", line 51, in sign_in_bot
+    r = await self.invoke(
+  File "C:\Users\abdou1\AppData\Local\Programs\Python\Python310\lib\site-packages\pyrogram\methods\advanced\invoke.py", line 79, in invoke
+    r = await self.session.invoke(
+  File "C:\Users\abdou1\AppData\Local\Programs\Python\Python310\lib\site-packages\pyrogram\session\session.py", line 389, in invoke
+    return await self.send(query, timeout=timeout)
+  File "C:\Users\abdou1\AppData\Local\Programs\Python\Python310\lib\site-packages\pyrogram\session\session.py", line 357, in send
+    RPCError.raise_it(result, type(data))
+  File "C:\Users\abdou1\AppData\Local\Programs\Python\Python310\lib\site-packages\pyrogram\errors\rpc_error.py", line 91, in raise_it
+    raise getattr(
+pyrogram.errors.exceptions.flood_420.FloodWait: Telegram says: [420 FLOOD_WAIT_X] - A wait of 1122 seconds is required (caused by "auth.ImportBotAuthorization")

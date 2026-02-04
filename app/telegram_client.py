@@ -1,11 +1,12 @@
 """
-TeleCloud Telegram Client - SIMPLIFIED VERSION
-Uses asyncio.run() per-operation instead of persistent background threads.
-This is more reliable in serverless/worker environments like Render.
+TeleCloud Telegram Client - Thread-Safe Version
+Uses explicit event loop creation per operation.
+Works reliably in gunicorn workers and background threads.
 """
 import asyncio
 import os
 import threading
+import traceback
 
 # Apply patch before importing Client
 import app.pyrogram_patch
@@ -14,15 +15,44 @@ from pyrogram.errors import FloodWait
 from .config import Config
 
 
+def run_async_safe(coro):
+    """
+    Thread-safe async runner that works in any context.
+    Creates a new event loop, runs the coroutine, then closes it.
+    """
+    try:
+        # Try to get existing loop
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # We're inside an async context - this shouldn't happen but handle it
+            print("[ASYNC] Warning: Loop is already running, creating new loop")
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                return loop.run_until_complete(coro)
+            finally:
+                loop.close()
+        else:
+            # Loop exists but not running - use it
+            return loop.run_until_complete(coro)
+    except RuntimeError:
+        # No event loop in this thread - create one
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+
+
 # ============================================================================
-# SIMPLE BOT CLIENT - No persistent threads, uses asyncio.run() per call
+# SIMPLE BOT CLIENT - Thread-safe operations
 # ============================================================================
 
 class BotClient:
     """
     Simplified Bot client that creates fresh connections per operation.
-    No background threads, no persistent event loops.
-    Works reliably in gunicorn and serverless environments.
+    Thread-safe and works in any execution context.
     """
     _instance = None
     _lock = threading.Lock()
@@ -65,19 +95,21 @@ class BotClient:
 
     def _get_next_token(self):
         """Round-robin token selection."""
-        token = self.bot_tokens[self._current_worker_index % len(self.bot_tokens)]
-        self._current_worker_index += 1
+        with self._lock:
+            token = self.bot_tokens[self._current_worker_index % len(self.bot_tokens)]
+            self._current_worker_index += 1
         return token
 
     def _run_with_client(self, async_func):
         """
         Creates a fresh client, runs the async function, then closes.
-        Uses asyncio.run() which is safe in any thread context.
+        Thread-safe: works in main thread, background threads, and gunicorn workers.
         """
         token = self._get_next_token()
-        worker_name = f"worker_{self._current_worker_index}"
+        worker_name = f"worker_{threading.current_thread().name}_{self._current_worker_index}"
         
         async def wrapper():
+            print(f"[BOT] Creating client {worker_name}...")
             client = Client(
                 worker_name,
                 api_id=self.api_id,
@@ -87,27 +119,31 @@ class BotClient:
                 no_updates=True
             )
             try:
+                print(f"[BOT] Starting client...")
                 await client.start()
-                print(f"[BOT] Worker connected, executing operation...")
+                print(f"[BOT] Client started! Executing operation...")
                 result = await async_func(client)
                 print(f"[BOT] Operation completed successfully!")
                 return result
             except FloodWait as e:
                 print(f"[BOT] FloodWait: sleeping {e.value} seconds...")
                 await asyncio.sleep(e.value)
+                # Retry after wait
                 return await async_func(client)
             except Exception as e:
-                print(f"[BOT] Error: {e}")
+                print(f"[BOT] Error during operation: {e}")
+                traceback.print_exc()
                 raise
             finally:
                 try:
+                    print(f"[BOT] Stopping client...")
                     await client.stop()
-                except:
-                    pass
+                    print(f"[BOT] Client stopped.")
+                except Exception as stop_err:
+                    print(f"[BOT] Error stopping client: {stop_err}")
         
-        # asyncio.run() creates a new event loop, runs the coroutine, then closes it
-        # This is safe and works in any thread/process context
-        return asyncio.run(wrapper())
+        # Use our thread-safe runner
+        return run_async_safe(wrapper())
 
     def connect(self):
         """Test connection by getting bot info."""
@@ -121,6 +157,7 @@ class BotClient:
 
     def upload_file(self, file_path, progress_callback=None):
         """Upload a single file to the channel."""
+        print(f"[BOT] Uploading file: {file_path}")
         async def upload(client):
             return await client.send_document(
                 self.channel_id,
@@ -132,14 +169,18 @@ class BotClient:
     
     def upload_chunks_parallel(self, chunk_paths, max_concurrent=3):
         """Upload multiple chunks. Each chunk uses its own connection."""
+        print(f"[BOT] Uploading {len(chunk_paths)} chunks...")
         results = []
-        for chunk_path in chunk_paths:
+        for i, chunk_path in enumerate(chunk_paths):
             try:
+                print(f"[BOT] Uploading chunk {i+1}/{len(chunk_paths)}: {chunk_path}")
                 result = self.upload_file(chunk_path)
                 results.append(result)
+                print(f"[BOT] Chunk {i+1}/{len(chunk_paths)} uploaded successfully!")
             except Exception as e:
-                print(f"[BOT] Chunk upload failed: {e}")
+                print(f"[BOT] Chunk {i+1} upload failed: {e}")
                 raise
+        print(f"[BOT] All {len(results)} chunks uploaded!")
         return results
 
     def download_file(self, message_id, output_path, progress_callback=None):
@@ -250,7 +291,7 @@ class TelegramCloud:
                 except:
                     pass
         
-        return asyncio.run(wrapper())
+        return run_async_safe(wrapper())
 
     def connect(self):
         if not self._connected:
@@ -321,7 +362,7 @@ class TelegramCloud:
             await temp_client.connect()
             code = await temp_client.send_code(phone)
             return temp_client, code.phone_code_hash
-        return asyncio.run(work())
+        return run_async_safe(work())
 
     @staticmethod
     def complete_login(temp_client, phone, code_hash, code):
@@ -331,7 +372,7 @@ class TelegramCloud:
             me = await temp_client.get_me()
             await temp_client.disconnect()
             return session_str, me.id
-        return asyncio.run(work())
+        return run_async_safe(work())
 
     def stop(self):
         self._connected = False

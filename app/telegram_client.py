@@ -362,18 +362,28 @@ class BotClient:
         target = self.channel_id
         
         async def upload_single(cp):
-            return await self.client.send_document(
-                target,
-                document=cp,
-                file_name=os.path.basename(cp)
-            )
-        
+            try:
+                print(f"[BG-ASYNC] Start uploading chunk: {os.path.basename(cp)}")
+                res = await self.client.send_document(
+                    target,
+                    document=cp,
+                    file_name=os.path.basename(cp)
+                )
+                print(f"[BG-ASYNC] Finished uploading chunk: {os.path.basename(cp)}")
+                return res
+            except Exception as e:
+                print(f"[BG-ASYNC] Error uploading chunk {cp}: {e}")
+                raise
+
         async def work():
+            print(f"[BG-ASYNC] Starting batch upload of {len(chunk_paths)} chunks")
             results = []
             for i in range(0, len(chunk_paths), max_concurrent):
                 batch = chunk_paths[i:i + max_concurrent]
+                print(f"[BG-ASYNC] Processing batch {i}-{i+max_concurrent}")
                 batch_results = await asyncio.gather(*[upload_single(cp) for cp in batch])
                 results.extend(batch_results)
+            print("[BG-ASYNC] All batches complete")
             return results
             
         return self._run_async(work())

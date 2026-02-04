@@ -274,7 +274,24 @@ class BotClient:
     def connect(self):
         with BotClient._lock:
             if not self._connected:
-                async def work(): await self.client.start()
+                async def work():
+                    try:
+                        await self.client.start()
+                    except Exception as e:
+                        # Check for FloodWait without importing pyrogram everywhere
+                        if "FLOOD_WAIT" in str(e):
+                            import re
+                            # Extract seconds from "A wait of X seconds is required" or similar
+                            match = re.search(r'wait of (\d+) seconds', str(e))
+                            wait_time = int(match.group(1)) if match else 60
+                            print(f"[BOT-CRITICAL] 🛑 TELEGRAM RATE LIMIT. Must wait {wait_time}s.")
+                            if wait_time > 300:
+                                print("[BOT] Waiting > 5 mins. This might take a while...")
+                            await asyncio.sleep(wait_time)
+                            await self.client.start()
+                        else:
+                            raise e
+
                 self._run_async(work())
                 self._connected = True
                 print(f"[BOT] Connected to channel {self.channel_id}")

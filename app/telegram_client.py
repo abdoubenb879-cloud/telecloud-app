@@ -244,7 +244,7 @@ class BotClient:
         is_dead = _loop_thread is None or not _loop_thread.is_alive()
         loop_changed = id(_loop) != self._loop_id if _loop else True
         
-        if is_dead orAIC loop_changed:
+        if is_dead or loop_changed:
             print(f"[BOT-FIX] Detected issue! Dead={is_dead}, Changed={loop_changed}. Recovering...")
             
             # 1. Restart Loop (thread)

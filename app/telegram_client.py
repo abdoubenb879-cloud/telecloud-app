@@ -35,13 +35,23 @@ def ensure_loop_running():
                 try:
                     _loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(_loop)
+                    
+                    # Add a keepalive task to prevent the loop from having nothing to do
+                    async def keepalive():
+                        while True:
+                            await asyncio.sleep(60)  # Heartbeat every 60 seconds
+                    
+                    _loop.create_task(keepalive())
                     _loop_ready.set()
                     print(f"[LOOP] Loop {_loop} running in thread {threading.current_thread().name}")
                     _loop.run_forever()
                 except Exception as e:
                     print(f"[LOOP] Loop crashed: {e}")
+                    import traceback
+                    traceback.print_exc()
 
-            _loop_thread = threading.Thread(target=run_loop, name="TeleCloudLoop", daemon=True)
+            # CRITICAL: daemon=False keeps thread alive even when main thread is idle
+            _loop_thread = threading.Thread(target=run_loop, name="TeleCloudLoop", daemon=False)
             _loop_thread.start()
             
             # Wait for startup

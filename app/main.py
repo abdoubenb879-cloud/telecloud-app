@@ -1452,13 +1452,18 @@ def process_background_upload(filepath, original_filename, user_id, mime_type, f
                     print(f"[BG] Video thumbnail failed: {ve}")
 
         try:
+            print("[BG] Connecting to Telegram Bot...")
             bot.connect()
+            print("[BG] Bot Connected. Starting parallel upload...")
+            
             # NEW: Upload chunks in parallel to Telegram (3x speedup)
             uploaded_messages = bot.upload_chunks_parallel(chunk_paths, max_concurrent=3)
+            print(f"[BG] Upload returned {len(uploaded_messages) if uploaded_messages else 0} messages")
             
             # Filter and store in DB
             for idx, msg in enumerate(uploaded_messages):
                 if not msg:
+                    print(f"[BG] ERROR: Chunk {idx} upload failed (msg is None)")
                     raise Exception(f"Failed to upload chunk {idx}")
                 
                 mid = msg.id if hasattr(msg, 'id') else msg.message_id

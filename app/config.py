@@ -14,6 +14,9 @@ class Config:
     
     # Bot Mode (NEW - Centralized storage)
     BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+    # Support multiple tokens for scaling (comma separated)
+    BOT_TOKENS = [t.strip() for t in os.getenv("BOT_TOKENS", "").split(",") if t.strip()] or ([BOT_TOKEN] if BOT_TOKEN else [])
+    
     STORAGE_CHANNEL_ID = int(os.getenv("STORAGE_CHANNEL_ID", 0)) if os.getenv("STORAGE_CHANNEL_ID") else None
     
     # Cloud / Multi-User settings

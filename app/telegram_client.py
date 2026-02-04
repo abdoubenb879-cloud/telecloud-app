@@ -52,18 +52,12 @@ def ensure_loop_running():
 
 class TelegramCloud:
     """Dynamic Telegram client meant to be instantiated per user session."""
-    # ... (Keep existing implementation logic if possible, or minimal changes) ...
-    # CHECK: TelegramCloud isn't the main issue, BotClient is. 
-    # But for safety, TelegramCloud should also use the new ensure_loop_running
     
     def __init__(self, session_string=None, api_id=None, api_hash=None):
         ensure_loop_running() 
         self.api_id = api_id or Config.API_ID
         self.api_hash = api_hash or Config.API_HASH
         self.storage_chat = Config.STORAGE_CHANNEL
-        
-        # NOTE: If loop restarts, old TelegramCloud instances die. 
-        # But they are usually short-lived in this app (created per request scope? No, looks like mostly BotClient is used).
         
         if session_string:
             async def create_cloud_client():
@@ -94,7 +88,6 @@ class TelegramCloud:
         self.storage_chat_title = "My Cloud Storage"
 
     def _run_async(self, coro_or_func):
-        # ... (keep existing) ...
         print(f"[ASYNC] Submitting work to loop {_loop}...")
         if asyncio.iscoroutine(coro_or_func):
             coro = coro_or_func
@@ -108,7 +101,6 @@ class TelegramCloud:
             print(f"[ASYNC] ERROR: {e}")
             raise
 
-    # ... (rest of methods standard) ...
     def connect(self):
         if not self._connected:
             async def work(): await self.client.start()
@@ -185,13 +177,13 @@ class TelegramCloud:
 
 
 # ============================================================================
-# BOT CLIENT - Centralized storage using a single bot account
+# BOT CLIENT - Centralized storage using a scaled WORKER POOL
 # ============================================================================
 
 class BotClient:
     """
-    Singleton Bot client.
-    Handles auto-recovery if the background event loop dies.
+    Singleton Bot client manager.
+    Manages a POOL of worker bots for high-concurrency uploads.
     """
     _instance = None
     _lock = threading.Lock()
@@ -208,163 +200,208 @@ class BotClient:
         if self._initialized:
             return
             
-        self.bot_token = Config.BOT_TOKEN
         self.channel_id = Config.STORAGE_CHANNEL_ID
         self.api_id = Config.API_ID
         self.api_hash = Config.API_HASH
+        self.bot_tokens = Config.BOT_TOKENS
         
-        self._create_client_on_loop()
+        if not self.bot_tokens:
+            raise ValueError("No BOT_TOKENS provided! Cannot start.")
+        if not self.channel_id:
+            raise ValueError("STORAGE_CHANNEL_ID is required.")
+        
+        self.clients = [] # List of Pyrogram Clients
+        self._loop_id = None
+        self._current_worker_index = 0
+        
+        self._create_clients_on_loop()
         self._initialized = True
-        print("[BOT] BotClient initialized successfully")
+        print(f"[BOT-POOL] Initialized with {len(self.clients)} worker bots.")
 
-    def _create_client_on_loop(self):
-        """Creates or Re-creates the Pyrogram client on the current active loop."""
+    def _create_clients_on_loop(self):
+        """Creates the worker pool on the current loop."""
         ensure_loop_running()
         
-        print("[BOT] Creating Pyrogram Client...")
-        async def create_bot():
-            return Client(
-                "telecloud_bot",
-                api_id=self.api_id,
-                api_hash=self.api_hash,
-                bot_token=self.bot_token,
-                in_memory=True,
-                no_updates=True
-            )
+        print(f"[BOT-POOL] Creating {len(self.bot_tokens)} clients on loop...")
+        self.clients = []
         
-        future = asyncio.run_coroutine_threadsafe(create_bot(), _loop)
-        self.client = future.result(timeout=30)
-        self._connected = False
-        self._loop_id = id(_loop) # Track which loop this client belongs to
+        async def create_all():
+            created = []
+            for i, token in enumerate(self.bot_tokens):
+                try:
+                    # Unique session name for each worker
+                    name = f"worker_{i}" 
+                    c = Client(name, api_id=self.api_id, api_hash=self.api_hash, bot_token=token, in_memory=True, no_updates=True)
+                    created.append(c)
+                except Exception as e:
+                    print(f"[BOT-POOL] Failed to create worker {i}: {e}")
+            return created
+        
+        future = asyncio.run_coroutine_threadsafe(create_all(), _loop)
+        self.clients = future.result(timeout=60)
+        self._loop_id = id(_loop)
+
+    def _get_worker(self):
+        """Round-robin selection of a worker."""
+        if not self.clients:
+            self._ensure_health() # Panic recovery
+            return None 
+            
+        # Round Robin
+        client = self.clients[self._current_worker_index % len(self.clients)]
+        self._current_worker_index += 1
+        return client
 
     def _ensure_health(self):
-        """Checks if loop is alive and matches our client. Restores if needed."""
+        """Checks if loop is alive and matches our client pool."""
         global _loop, _loop_thread
         
         is_dead = _loop_thread is None or not _loop_thread.is_alive()
         loop_changed = id(_loop) != self._loop_id if _loop else True
         
         if is_dead or loop_changed:
-            print(f"[BOT-FIX] Detected issue! Dead={is_dead}, Changed={loop_changed}. Recovering...")
-            
-            # 1. Restart Loop (thread)
+            print(f"[BOT-FIX] Pool Health Check Failed (Dead={is_dead}, Changed={loop_changed}). Rebooting Pool...")
             ensure_loop_running()
-            
-            # 2. Re-create Client (bind to new loop)
-            # Check ID again to be sure
             if id(_loop) != self._loop_id:
-                print("[BOT-FIX] Loop ID changed. Recreating client...")
-                self._create_client_on_loop()
-                
-                # 3. Auto-Connect if we were supposed to be connected
-                print("[BOT-FIX] Reconnecting...")
+                print("[BOT-FIX] Recreating implementation pool...")
+                self._create_clients_on_loop()
+                print("[BOT-FIX] Reconnecting all workers...")
                 self.connect()
 
     def _run_async(self, coro):
-        """Run async operation with auto-recovery."""
+        """Run async operation with pool recovery."""
         self._ensure_health()
-        
         future = asyncio.run_coroutine_threadsafe(coro, _loop)
         try:
-            return future.result(timeout=300) # 5 minutes timeout
+            return future.result(timeout=300) # 5m timeout
         except Exception as e:
             print(f"[BOT-ERROR] Async task failed: {e}")
             raise
 
     def connect(self):
         with BotClient._lock:
-            if not self._connected:
-                async def work():
-                    try:
-                        await self.client.start()
-                    except Exception as e:
-                        # Check for FloodWait without importing pyrogram everywhere
-                        if "FLOOD_WAIT" in str(e):
-                            import re
-                            # Extract seconds from "A wait of X seconds is required" or similar
-                            match = re.search(r'wait of (\d+) seconds', str(e))
-                            wait_time = int(match.group(1)) if match else 60
-                            print(f"[BOT-CRITICAL] 🛑 TELEGRAM RATE LIMIT. Must wait {wait_time}s.")
-                            if wait_time > 300:
-                                print("[BOT] Waiting > 5 mins. This might take a while...")
-                            await asyncio.sleep(wait_time)
-                            await self.client.start()
-                        else:
-                            raise e
-
-                self._run_async(work())
-                self._connected = True
-                print(f"[BOT] Connected to channel {self.channel_id}")
+            # Connect ALL workers
+            async def connect_all():
+                tasks = []
+                for i, c in enumerate(self.clients):
+                   if not c.is_connected:
+                       tasks.append(self._safe_start(c, i))
+                if tasks:
+                    await asyncio.gather(*tasks)
+            
+            self._run_async(connect_all())
+            print(f"[BOT-POOL] All workers connected to channel {self.channel_id}")
         return self
     
-    def stop(self):
-        if self._connected:
-            async def work(): await self.client.stop()
-            self._run_async(work())
-            self._connected = False
-    
+    async def _safe_start(self, client, index):
+        try:
+            await client.start()
+        except Exception as e:
+             if "FLOOD_WAIT" in str(e):
+                import re
+                match = re.search(r'wait of (\d+) seconds', str(e))
+                wait = int(match.group(1)) if match else 60
+                print(f"[WORKER-{index}] 🛑 RATELIMIT: Waiting {wait}s")
+                await asyncio.sleep(wait)
+                await client.start()
+             else:
+                 print(f"[WORKER-{index}] Failed to start: {e}")
+
     def upload_file(self, file_path, progress_callback=None):
+        client = self._get_worker()
+        if not client: raise RuntimeError("No workers available")
         async def work():
-            return await self.client.send_document(self.channel_id, document=file_path, file_name=os.path.basename(file_path), progress=progress_callback)
+            return await client.send_document(self.channel_id, document=file_path, file_name=os.path.basename(file_path), progress=progress_callback)
         return self._run_async(work())
     
-    def download_file(self, message_id, output_path, progress_callback=None):
+    def upload_chunks_parallel(self, chunk_paths, max_concurrent=3):
+        target = self.channel_id
+        
+        # We can now use MULTIPLE workers for a single file upload if we want!
+        # But simpler: Each chunk gets assigned a worker round-robin.
+        
+        async def upload_single(cp, worker):
+            return await worker.send_document(target, document=cp, file_name=os.path.basename(cp))
+
         async def work():
-            msg = await self.client.get_messages(self.channel_id, message_id)
+            tasks = []
+            for cp in chunk_paths:
+                worker = self._get_worker() # Load balance chunks across bots!
+                if not worker: continue
+                tasks.append(upload_single(cp, worker))
+            
+            # Limit concurrency per batch to avoid blowing up memory
+            # If 10 bots, we can do 10-20 parallel easily.
+            results = []
+            batch_size = 5
+            for i in range(0, len(tasks), batch_size):
+                 batch = tasks[i:i+batch_size]
+                 batch_errors = await asyncio.gather(*batch, return_exceptions=True)
+                 for res in batch_errors:
+                     if isinstance(res, Exception): raise res
+                     results.append(res)
+            return results
+            
+        return self._run_async(work())
+
+    # ... (Keep download/delete/etc methods similar, using self._get_worker()) ...
+    def download_file(self, message_id, output_path, progress_callback=None):
+        client = self._get_worker()
+        if not client: raise RuntimeError("No workers available")
+        async def work():
+            msg = await client.get_messages(self.channel_id, message_id)
             if not msg or not msg.document: raise Exception("File not found")
-            return await self.client.download_media(msg, file_name=output_path, progress=progress_callback)
+            return await client.download_media(msg, file_name=output_path, progress=progress_callback)
         return self._run_async(work())
     
     def delete_message(self, message_id):
-        async def work(): await self.client.delete_messages(self.channel_id, message_id)
+        client = self._get_worker()
+        if not client: return
+        async def work(): await client.delete_messages(self.channel_id, message_id)
         self._run_async(work())
     
     def download_media(self, message_id, in_memory=False):
+        client = self._get_worker()
+        if not client: return None
         async def work():
-            msg = await self.client.get_messages(self.channel_id, message_id)
+            msg = await client.get_messages(self.channel_id, message_id)
             if not msg or not msg.document: return None
-            return await self.client.download_media(msg, in_memory=in_memory)
+            return await client.download_media(msg, in_memory=in_memory)
         return self._run_async(work())
 
     def get_file_range(self, message_id, offset, limit):
+        client = self._get_worker()
+        if not client: return None
         async def work():
-            msg = await self.client.get_messages(str(self.channel_id), message_id)
+            msg = await client.get_messages(str(self.channel_id), message_id)
             if not msg or not msg.document: return None
             chunk = b""
-            async for data in self.client.stream_media(msg, offset=offset, limit=limit):
+            async for data in client.stream_media(msg, offset=offset, limit=limit):
                 chunk += data
             return chunk
         return self._run_async(work())
 
     def download_chunks_parallel(self, message_ids, max_concurrent=3):
-        async def download_single(msg_id):
-            msg = await self.client.get_messages(self.channel_id, msg_id)
+        async def download_single(msg_id, worker):
+            msg = await worker.get_messages(self.channel_id, msg_id)
             if not msg or not msg.document: return None
-            return await self.client.download_media(msg, in_memory=False)
+            return await worker.download_media(msg, in_memory=False)
         
         async def work():
-            results = []
-            for i in range(0, len(message_ids), max_concurrent):
-                batch = message_ids[i:i + max_concurrent]
-                batch_results = await asyncio.gather(*[download_single(mid) for mid in batch])
-                results.extend(batch_results)
-            return results
+            tasks = []
+            for mid in message_ids:
+                worker = self._get_worker() # Spread download load too
+                if not worker: continue
+                tasks.append(download_single(mid, worker))
+            
+            # Use gather
+            return await asyncio.gather(*tasks)
+            
         return self._run_async(work())
-
-    def upload_chunks_parallel(self, chunk_paths, max_concurrent=3):
-        target = self.channel_id
-        async def upload_single(cp):
-            return await self.client.send_document(target, document=cp, file_name=os.path.basename(cp))
-
-        async def work():
-            results = []
-            for i in range(0, len(chunk_paths), max_concurrent):
-                batch = chunk_paths[i:i + max_concurrent]
-                batch_results = await asyncio.gather(*[upload_single(cp) for cp in batch])
-                results.extend(batch_results)
-            return results
-        return self._run_async(work())
-
+    
+    def stop(self):
+        # Stop all workers
+        pass
 
 # Global bot instance
 _bot_instance = None

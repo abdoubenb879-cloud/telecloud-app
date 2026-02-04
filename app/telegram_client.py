@@ -1,16 +1,13 @@
 """
-TeleCloud Telegram Client - BULLETPROOF VERSION
-Uses nest_asyncio to solve all asyncio/threading issues.
-Simple, clean, works everywhere.
+TeleCloud Telegram Client - DEDICATED LOOP THREAD VERSION
+Uses a single persistent event loop thread for ALL async operations.
+Background threads submit work to this loop using run_coroutine_threadsafe.
 """
 import asyncio
 import os
+import threading
 import traceback
-
-# CRITICAL: Apply nest_asyncio FIRST before any async code
-# This allows asyncio.run() to work inside existing event loops
-import nest_asyncio
-nest_asyncio.apply()
+import atexit
 
 # Apply Pyrogram patch for 64-bit channel IDs
 import app.pyrogram_patch
@@ -19,26 +16,110 @@ from pyrogram.errors import FloodWait
 from .config import Config
 
 
+# ============================================================================
+# DEDICATED EVENT LOOP THREAD - Single loop for all async operations
+# ============================================================================
+
+class AsyncLoopThread:
+    """
+    Runs a dedicated event loop in a background thread.
+    All async operations are submitted to this loop.
+    """
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self):
+        if self._initialized:
+            return
+        
+        self._loop = None
+        self._thread = None
+        self._ready = threading.Event()
+        self._start_loop()
+        self._initialized = True
+    
+    def _start_loop(self):
+        """Start the event loop in a background thread."""
+        def run_loop():
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+            print("[LOOP] Event loop thread started")
+            self._ready.set()
+            try:
+                self._loop.run_forever()
+            finally:
+                self._loop.close()
+                print("[LOOP] Event loop thread stopped")
+        
+        self._thread = threading.Thread(target=run_loop, name="TeleCloudAsyncLoop", daemon=True)
+        self._thread.start()
+        
+        # Wait for loop to be ready
+        self._ready.wait(timeout=10)
+        if not self._ready.is_set():
+            raise RuntimeError("Event loop thread failed to start")
+        print("[LOOP] Event loop ready")
+    
+    def run(self, coro, timeout=120):
+        """
+        Run a coroutine on the event loop thread and wait for result.
+        Safe to call from any thread.
+        """
+        if self._loop is None or not self._thread.is_alive():
+            print("[LOOP] Loop died, restarting...")
+            self._ready.clear()
+            self._start_loop()
+        
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        try:
+            return future.result(timeout=timeout)
+        except Exception as e:
+            print(f"[LOOP] Error running coroutine: {e}")
+            traceback.print_exc()
+            raise
+    
+    def stop(self):
+        """Stop the event loop."""
+        if self._loop:
+            self._loop.call_soon_threadsafe(self._loop.stop)
+
+
+# Global loop instance
+_loop_thread = None
+
+def get_loop():
+    """Get the global async loop thread."""
+    global _loop_thread
+    if _loop_thread is None:
+        _loop_thread = AsyncLoopThread()
+    return _loop_thread
+
+
+# ============================================================================
+# TELEGRAM UPLOADER - Uses the dedicated loop thread
+# ============================================================================
+
 class TelegramUploader:
     """
-    Simple, stateless Telegram uploader.
-    Each instance creates a fresh connection.
-    Thread-safe and works in any context.
+    Simple Telegram uploader that uses the shared event loop thread.
+    Thread-safe - can be called from any thread.
     """
     
-    def __init__(self, bot_token=None, api_id=None, api_hash=None, channel_id=None):
+    def __init__(self, bot_token, api_id=None, api_hash=None, channel_id=None):
         self.bot_token = bot_token
         self.api_id = api_id or Config.API_ID
         self.api_hash = api_hash or Config.API_HASH
         self.channel_id = channel_id or Config.STORAGE_CHANNEL_ID
-        
-        if not self.bot_token:
-            raise ValueError("bot_token is required")
-        if not self.channel_id:
-            raise ValueError("channel_id is required")
-        
-        # Unique name for this uploader instance
         self._name = f"uploader_{id(self)}"
+        self._loop = get_loop()
     
     def _create_client(self):
         """Create a fresh Pyrogram client."""
@@ -52,35 +133,45 @@ class TelegramUploader:
         )
     
     def test_connection(self):
-        """Test that the bot can connect to Telegram."""
-        print(f"[UPLOADER] Testing connection...")
+        """Test that the bot can connect."""
+        print("[UPLOADER] Testing connection...")
         
         async def _test():
+            print("[UPLOADER] Creating client...")
             client = self._create_client()
             try:
+                print("[UPLOADER] Starting client...")
                 await client.start()
+                print("[UPLOADER] Client started!")
                 me = await client.get_me()
                 print(f"[UPLOADER] Connected as @{me.username}")
                 return me
+            except Exception as e:
+                print(f"[UPLOADER] Connection failed: {e}")
+                traceback.print_exc()
+                raise
             finally:
-                await client.stop()
+                try:
+                    print("[UPLOADER] Stopping client...")
+                    await client.stop()
+                    print("[UPLOADER] Client stopped.")
+                except Exception as se:
+                    print(f"[UPLOADER] Stop error: {se}")
         
-        return asyncio.run(_test())
+        return self._loop.run(_test())
     
     def upload_file(self, file_path, progress_callback=None):
-        """
-        Upload a single file to the channel.
-        Returns the message object from Telegram.
-        """
+        """Upload a file to the channel."""
         print(f"[UPLOADER] Uploading: {file_path}")
         print(f"[UPLOADER] To channel: {self.channel_id}")
         
         async def _upload():
+            print("[UPLOADER] Creating client for upload...")
             client = self._create_client()
             try:
-                print(f"[UPLOADER] Starting client...")
+                print("[UPLOADER] Starting client for upload...")
                 await client.start()
-                print(f"[UPLOADER] Client started, uploading file...")
+                print("[UPLOADER] Client started, sending document...")
                 
                 result = await client.send_document(
                     chat_id=self.channel_id,
@@ -89,20 +180,19 @@ class TelegramUploader:
                     progress=progress_callback
                 )
                 
-                print(f"[UPLOADER] Upload successful! Message ID: {result.id}")
+                print(f"[UPLOADER] Upload SUCCESS! Message ID: {result.id}")
                 return result
             
             except FloodWait as e:
-                print(f"[UPLOADER] Rate limited! Waiting {e.value} seconds...")
+                print(f"[UPLOADER] FloodWait: {e.value} seconds")
                 await asyncio.sleep(e.value)
-                # Retry
                 result = await client.send_document(
                     chat_id=self.channel_id,
                     document=file_path,
                     file_name=os.path.basename(file_path),
                     progress=progress_callback
                 )
-                print(f"[UPLOADER] Retry successful! Message ID: {result.id}")
+                print(f"[UPLOADER] Retry SUCCESS! Message ID: {result.id}")
                 return result
             
             except Exception as e:
@@ -112,17 +202,17 @@ class TelegramUploader:
             
             finally:
                 try:
-                    print(f"[UPLOADER] Stopping client...")
+                    print("[UPLOADER] Stopping client after upload...")
                     await client.stop()
-                    print(f"[UPLOADER] Client stopped.")
-                except Exception as stop_err:
-                    print(f"[UPLOADER] Error stopping client: {stop_err}")
+                    print("[UPLOADER] Client stopped after upload.")
+                except Exception as se:
+                    print(f"[UPLOADER] Stop error: {se}")
         
-        return asyncio.run(_upload())
+        return self._loop.run(_upload(), timeout=300)  # 5 min timeout for uploads
     
     def download_file(self, message_id, output_path, progress_callback=None):
         """Download a file from the channel."""
-        print(f"[UPLOADER] Downloading message {message_id} to {output_path}")
+        print(f"[UPLOADER] Downloading message {message_id}")
         
         async def _download():
             client = self._create_client()
@@ -131,7 +221,6 @@ class TelegramUploader:
                 msg = await client.get_messages(self.channel_id, message_id)
                 if not msg or not msg.document:
                     raise Exception("File not found")
-                
                 result = await client.download_media(
                     msg,
                     file_name=output_path,
@@ -142,7 +231,7 @@ class TelegramUploader:
             finally:
                 await client.stop()
         
-        return asyncio.run(_download())
+        return self._loop.run(_download(), timeout=300)
     
     def delete_message(self, message_id):
         """Delete a message from the channel."""
@@ -153,11 +242,11 @@ class TelegramUploader:
             try:
                 await client.start()
                 await client.delete_messages(self.channel_id, message_id)
-                print(f"[UPLOADER] Message deleted")
+                print("[UPLOADER] Message deleted")
             finally:
                 await client.stop()
         
-        return asyncio.run(_delete())
+        return self._loop.run(_delete())
     
     def download_media(self, message_id, in_memory=False):
         """Download media from the channel."""
@@ -172,10 +261,10 @@ class TelegramUploader:
             finally:
                 await client.stop()
         
-        return asyncio.run(_download())
+        return self._loop.run(_download(), timeout=300)
     
     def get_file_range(self, message_id, offset, limit):
-        """Download a specific byte range (for streaming)."""
+        """Download a specific byte range."""
         async def _stream():
             client = self._create_client()
             try:
@@ -190,18 +279,15 @@ class TelegramUploader:
             finally:
                 await client.stop()
         
-        return asyncio.run(_stream())
+        return self._loop.run(_stream())
 
 
 # ============================================================================
-# BOT CLIENT MANAGER - Simple token rotation
+# BOT CLIENT - Token rotation and management
 # ============================================================================
 
 class BotClient:
-    """
-    Manages multiple bot tokens with round-robin rotation.
-    Creates fresh TelegramUploader for each operation.
-    """
+    """Manages multiple bot tokens with round-robin."""
     _instance = None
     
     def __new__(cls):
@@ -219,9 +305,8 @@ class BotClient:
         self.channel_id = Config.STORAGE_CHANNEL_ID
         self.bot_tokens = Config.BOT_TOKENS
         
-        # Fallback: scan environment
         if not self.bot_tokens:
-            print("[BOT] Config.BOT_TOKENS empty, scanning environment...")
+            print("[BOT] Scanning environment for tokens...")
             self.bot_tokens = []
             for key, val in os.environ.items():
                 if key.startswith("BOT_TOKEN") and key != "BOT_TOKENS":
@@ -231,20 +316,18 @@ class BotClient:
                         print(f"[BOT] Found token from {key}")
         
         if not self.bot_tokens:
-            raise ValueError("No BOT_TOKENS provided! Cannot start.")
+            raise ValueError("No BOT_TOKENS provided!")
         
         self._token_index = 0
         self._initialized = True
         print(f"[BOT] Initialized with {len(self.bot_tokens)} bot tokens")
     
     def _get_next_token(self):
-        """Get next token using round-robin."""
         token = self.bot_tokens[self._token_index % len(self.bot_tokens)]
         self._token_index += 1
         return token
     
     def _create_uploader(self):
-        """Create a fresh uploader with the next token."""
         return TelegramUploader(
             bot_token=self._get_next_token(),
             api_id=self.api_id,
@@ -253,51 +336,45 @@ class BotClient:
         )
     
     def connect(self):
-        """Test connection with one of the bots."""
+        """Test connection."""
         uploader = self._create_uploader()
         uploader.test_connection()
-        print(f"[BOT] Connection test successful!")
+        print("[BOT] Connection test successful!")
         return self
     
     def upload_file(self, file_path, progress_callback=None):
-        """Upload a file using the next available bot."""
         uploader = self._create_uploader()
         return uploader.upload_file(file_path, progress_callback)
     
     def upload_chunks_parallel(self, chunk_paths, max_concurrent=3):
-        """Upload multiple chunks sequentially (one bot per chunk)."""
+        """Upload multiple chunks."""
         print(f"[BOT] Uploading {len(chunk_paths)} chunks...")
         results = []
         for i, chunk_path in enumerate(chunk_paths):
-            print(f"[BOT] Chunk {i+1}/{len(chunk_paths)}: {chunk_path}")
+            print(f"[BOT] Chunk {i+1}/{len(chunk_paths)}")
             uploader = self._create_uploader()
             result = uploader.upload_file(chunk_path)
             results.append(result)
-        print(f"[BOT] All {len(results)} chunks uploaded successfully!")
+        print(f"[BOT] All {len(results)} chunks uploaded!")
         return results
     
     def download_file(self, message_id, output_path, progress_callback=None):
-        """Download a file."""
         uploader = self._create_uploader()
         return uploader.download_file(message_id, output_path, progress_callback)
     
     def delete_message(self, message_id):
-        """Delete a message."""
         uploader = self._create_uploader()
         return uploader.delete_message(message_id)
     
     def download_media(self, message_id, in_memory=False):
-        """Download media."""
         uploader = self._create_uploader()
         return uploader.download_media(message_id, in_memory)
     
     def get_file_range(self, message_id, offset, limit):
-        """Get file range for streaming."""
         uploader = self._create_uploader()
         return uploader.get_file_range(message_id, offset, limit)
     
     def download_chunks_parallel(self, message_ids, max_concurrent=3):
-        """Download multiple chunks."""
         results = []
         for msg_id in message_ids:
             uploader = self._create_uploader()
@@ -306,16 +383,15 @@ class BotClient:
         return results
     
     def stop(self):
-        """Nothing to stop - connections are closed after each operation."""
         pass
 
 
 # ============================================================================
-# TELEGRAM CLOUD - User session client (for user-mode auth)
+# TELEGRAM CLOUD - User session client
 # ============================================================================
 
 class TelegramCloud:
-    """Dynamic Telegram client for user sessions."""
+    """User session client."""
     
     def __init__(self, session_string=None, api_id=None, api_hash=None):
         self.api_id = api_id or Config.API_ID
@@ -325,6 +401,7 @@ class TelegramCloud:
         self._connected = False
         self._resolved_chat_id = None
         self.storage_chat_title = "My Cloud Storage"
+        self._loop = get_loop()
     
     def _create_client(self):
         if self.session_string:
@@ -354,7 +431,7 @@ class TelegramCloud:
                 await client.stop()
                 return me
             
-            asyncio.run(_connect())
+            self._loop.run(_connect())
             self._connected = True
             self._resolve_chat()
         return self
@@ -368,10 +445,10 @@ class TelegramCloud:
                 await client.stop()
                 return chat
             
-            chat = asyncio.run(_resolve())
+            chat = self._loop.run(_resolve())
             self._resolved_chat_id = chat.id
             self.storage_chat_title = getattr(chat, 'title', None) or getattr(chat, 'first_name', 'Private Chat')
-        except Exception:
+        except:
             self._resolved_chat_id = None
             self.storage_chat_title = "Saved Messages"
     
@@ -390,7 +467,7 @@ class TelegramCloud:
             await client.stop()
             return result
         
-        return asyncio.run(_upload())
+        return self._loop.run(_upload(), timeout=300)
     
     def download_file(self, message_id, output_path, progress_callback=None):
         target = self._resolved_chat_id or self.storage_chat
@@ -406,7 +483,7 @@ class TelegramCloud:
             await client.stop()
             return result
         
-        return asyncio.run(_download())
+        return self._loop.run(_download(), timeout=300)
     
     def delete_message(self, message_id):
         target = self._resolved_chat_id or self.storage_chat
@@ -417,7 +494,7 @@ class TelegramCloud:
             await client.delete_messages(target, message_id)
             await client.stop()
         
-        asyncio.run(_delete())
+        self._loop.run(_delete())
     
     def download_media(self, message_id, in_memory=False):
         target = self._resolved_chat_id or self.storage_chat
@@ -433,20 +510,24 @@ class TelegramCloud:
             await client.stop()
             return result
         
-        return asyncio.run(_download())
+        return self._loop.run(_download(), timeout=300)
     
     @staticmethod
     def send_login_code(api_id, api_hash, phone):
+        loop = get_loop()
+        
         async def _send():
             temp_client = Client(":memory:", api_id=api_id, api_hash=api_hash, in_memory=True)
             await temp_client.connect()
             code = await temp_client.send_code(phone)
             return temp_client, code.phone_code_hash
         
-        return asyncio.run(_send())
+        return loop.run(_send())
     
     @staticmethod
     def complete_login(temp_client, phone, code_hash, code):
+        loop = get_loop()
+        
         async def _complete():
             await temp_client.sign_in(phone, code_hash, code)
             session_str = await temp_client.export_session_string()
@@ -454,7 +535,7 @@ class TelegramCloud:
             await temp_client.disconnect()
             return session_str, me.id
         
-        return asyncio.run(_complete())
+        return loop.run(_complete())
     
     def stop(self):
         self._connected = False
@@ -467,8 +548,18 @@ class TelegramCloud:
 _bot_instance = None
 
 def get_bot_client():
-    """Get the global BotClient instance."""
     global _bot_instance
     if _bot_instance is None:
         _bot_instance = BotClient()
     return _bot_instance
+
+
+# Initialize the loop thread early
+def _init():
+    try:
+        get_loop()
+        print("[INIT] Async loop thread initialized")
+    except Exception as e:
+        print(f"[INIT] Failed to initialize loop thread: {e}")
+
+_init()

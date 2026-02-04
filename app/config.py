@@ -13,9 +13,21 @@ class Config:
     STORAGE_CHANNEL = os.getenv("STORAGE_CHANNEL", "me")
     
     # Bot Mode (NEW - Centralized storage)
+    # Bot Mode (NEW - Centralized storage)
     BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-    # Support multiple tokens for scaling (comma separated)
-    BOT_TOKENS = [t.strip() for t in os.getenv("BOT_TOKENS", "").split(",") if t.strip()] or ([BOT_TOKEN] if BOT_TOKEN else [])
+    
+    # Support multiple tokens for scaling (comma separated OR separate env vars)
+    BOT_TOKENS = [t.strip() for t in os.getenv("BOT_TOKENS", "").split(",") if t.strip()]
+    
+    # Also scan for BOT_TOKEN1, BOT_TOKEN2, etc.
+    for key, val in os.environ.items():
+        if key.startswith("BOT_TOKEN") and key != "BOT_TOKENS" and val.strip():
+            if val.strip() not in BOT_TOKENS:
+                BOT_TOKENS.append(val.strip())
+    
+    # Fallback to single token if list is empty
+    if not BOT_TOKENS and BOT_TOKEN:
+        BOT_TOKENS = [BOT_TOKEN]
     
     STORAGE_CHANNEL_ID = int(os.getenv("STORAGE_CHANNEL_ID", 0)) if os.getenv("STORAGE_CHANNEL_ID") else None
     

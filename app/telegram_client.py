@@ -266,9 +266,20 @@ class BotClient:
     
     def _run_async(self, coro):
         """Run async operation in the background loop."""
+        print(f"[BOT-DEBUG] _run_async called. Loop: {_loop}, Running: {_loop.is_running() if _loop else 'None'}")
+        if not _loop or not _loop.is_running():
+             print("[BOT-DEBUG] CRITICAL: Loop is not running!")
+             
+        import threading
+        print(f"[BOT-DEBUG] Threads: {[t.name for t in threading.enumerate()]}")
+
         future = asyncio.run_coroutine_threadsafe(coro, _loop)
-        return future.result(timeout=6000)
-    
+        try:
+            return future.result(timeout=15) # Short timeout to catch hangs
+        except Exception as e:
+            print(f"[BOT-DEBUG] Future timed out or failed: {e}")
+            raise
+
     def connect(self):
         """Start the bot client (thread-safe)."""
         # Use lock to prevent multiple threads from triggering simultaneous auth

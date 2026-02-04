@@ -203,9 +203,24 @@ class BotClient:
         self.channel_id = Config.STORAGE_CHANNEL_ID
         self.api_id = Config.API_ID
         self.api_hash = Config.API_HASH
+        # Try Config first
         self.bot_tokens = Config.BOT_TOKENS
         
+        # Fallback: aggressive reload from environment if Config is empty
         if not self.bot_tokens:
+            print("[BOT-INIT] Config.BOT_TOKENS is empty! Attempting manual reload...")
+            raw_tokens = os.getenv("BOT_TOKENS", "")
+            fallback_token = os.getenv("BOT_TOKEN", "")
+            
+            print(f"[BOT-INIT] Raw BOT_TOKENS len: {len(raw_tokens)}")
+            print(f"[BOT-INIT] Raw BOT_TOKEN len: {len(fallback_token)}")
+            
+            self.bot_tokens = [t.strip() for t in raw_tokens.split(",") if t.strip()]
+            if not self.bot_tokens and fallback_token:
+                self.bot_tokens = [fallback_token]
+                
+        if not self.bot_tokens:
+            print("[BOT-CRITICAL] Still no tokens found after fallback!")
             raise ValueError("No BOT_TOKENS provided! Cannot start.")
         if not self.channel_id:
             raise ValueError("STORAGE_CHANNEL_ID is required.")
